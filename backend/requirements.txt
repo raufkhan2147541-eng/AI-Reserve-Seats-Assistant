@@ -1,0 +1,11 @@
+
+fastapi
+uvicorn[standard]
+python-multipart
+pymupdf
+pydantic
+python-dotenv
+passlib[bcrypt]
+python-jose[cryptography]
+httpx
+email-validator
