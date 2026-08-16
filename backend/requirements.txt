@@ -9,3 +9,4 @@ python-jose[cryptography]
 PyJWT
 httpx
 email-validator
+google-genai
