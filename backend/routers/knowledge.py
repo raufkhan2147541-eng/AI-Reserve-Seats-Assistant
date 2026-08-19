@@ -4,8 +4,8 @@ from pathlib import Path
 import fitz
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-from auth_utils import get_current_admin
-from database import get_connection
+from backend.auth_utils import get_current_admin
+from backend.database import get_connection
 
 
 router = APIRouter(

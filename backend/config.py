@@ -7,7 +7,14 @@ from dotenv import load_dotenv
 # Load Environment Variables
 # ==========================================
 
-load_dotenv()
+# Project root ki .env file load karo
+BASE_DIR = os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))
+)
+
+ENV_FILE = os.path.join(BASE_DIR, ".env")
+
+load_dotenv(ENV_FILE)
 
 
 # ==========================================
@@ -83,4 +90,29 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(
         "ACCESS_TOKEN_EXPIRE_MINUTES",
         "60",
     )
+)
+
+
+# ==========================================
+# JWT Settings
+# ==========================================
+
+JWT_SECRET_KEY = os.getenv(
+    "JWT_SECRET_KEY",
+)
+
+JWT_EXPIRE_MINUTES = int(
+    os.getenv(
+        "JWT_EXPIRE_MINUTES",
+        "60",
+    )
+)
+
+
+# ==========================================
+# Gemini API
+# ==========================================
+
+GEMINI_API_KEY = os.getenv(
+    "GEMINI_API_KEY",
 )

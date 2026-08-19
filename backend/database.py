@@ -1,6 +1,6 @@
 import sqlite3
 
-from config import DATABASE_URL
+from backend.config import DATABASE_URL
 
 
 # ==========================================

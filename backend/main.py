@@ -1,14 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import initialize_database
+from backend.database import initialize_database
 
-from routers.auth import router as auth_router
-from routers.knowledge import router as knowledge_router
-from routers.qa import router as qa_router
-from routers.universities import router as universities_router
+from backend.routers.auth import router as auth_router
+from backend.routers.knowledge import router as knowledge_router
+from backend.routers.qa import router as qa_router
+from backend.routers.universities import router as universities_router
 
-from admin import router as admin_router
+from backend.admin import router as admin_router
 
 
 # ==========================================
@@ -34,6 +34,9 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+
+        # Vercel Frontend
+        "https://ai-reserve-seats-assistant.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -52,47 +55,31 @@ initialize_database()
 # Register Routers
 # ==========================================
 
-
-# ------------------------------------------
 # Student Authentication
-# ------------------------------------------
-
 app.include_router(
     auth_router
 )
 
 
-# ------------------------------------------
 # Knowledge Base
-# ------------------------------------------
-
 app.include_router(
     knowledge_router
 )
 
 
-# ------------------------------------------
 # Question Answering
-# ------------------------------------------
-
 app.include_router(
     qa_router
 )
 
 
-# ------------------------------------------
 # University Information
-# ------------------------------------------
-
 app.include_router(
     universities_router
 )
 
 
-# ------------------------------------------
 # Admin Dashboard
-# ------------------------------------------
-
 app.include_router(
     admin_router
 )

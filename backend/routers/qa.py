@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from auth_utils import get_current_student
-from database import get_connection
-from services.qa_service import search_knowledge
-from services.gemini_service import generate_answer
+from backend.auth_utils import get_current_student
+from backend.database import get_connection
+from backend.services.qa_service import search_knowledge
+from backend.services.gemini_service import generate_answer
 
 
 router = APIRouter(
