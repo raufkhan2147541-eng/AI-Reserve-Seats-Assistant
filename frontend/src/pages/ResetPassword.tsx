@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Button from "../components/Button";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "https://ai-reserve-seats-assistant.onrender.com";
 
 const ResetPassword = () => {
   const [token, setToken] = useState("");

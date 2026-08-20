@@ -93,7 +93,7 @@ const AdminDocuments = () => {
       // --------------------------------------
 
       const response = await fetch(
-        "http://127.0.0.1:8000/admin/documents",
+        "https://ai-reserve-seats-assistant.onrender.com/admin/documents",
         {
           method: "GET",
 
@@ -225,7 +225,7 @@ const AdminDocuments = () => {
       // --------------------------------------
 
       const response = await fetch(
-        `http://127.0.0.1:8000/admin/documents/${documentId}`,
+        `https://ai-reserve-seats-assistant.onrender.com/admin/documents/${documentId}`,
         {
           method: "DELETE",
 

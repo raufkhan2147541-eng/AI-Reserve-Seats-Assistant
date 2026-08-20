@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Button from "../components/Button";
 
-const API_URL = "https://ai-reserve-seats-assistant-yompsp34o-minhaj-solution.vercel.app";
+const API_URL = "https://ai-reserve-seats-assistant.onrender.com";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");

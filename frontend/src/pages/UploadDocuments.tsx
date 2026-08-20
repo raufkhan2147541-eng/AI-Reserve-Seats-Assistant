@@ -17,7 +17,7 @@ const UploadDocuments = () => {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const API_URL = "http://127.0.0.1:8000";
+  const API_URL = "https://ai-reserve-seats-assistant.onrender.com";
 
   // ==========================================
   // Get Access Token
