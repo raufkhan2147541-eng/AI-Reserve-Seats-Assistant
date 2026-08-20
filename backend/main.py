@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.create_admin import create_admin
+
 from backend.database import initialize_database
 
 from backend.routers.auth import router as auth_router
@@ -49,6 +51,7 @@ app.add_middleware(
 # ==========================================
 
 initialize_database()
+create_admin()
 
 
 # ==========================================
