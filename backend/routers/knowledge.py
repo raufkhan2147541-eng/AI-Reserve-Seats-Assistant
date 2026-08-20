@@ -1,7 +1,7 @@
 import shutil
 from pathlib import Path
 
-import fitz
+import pymupdf
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from backend.auth_utils import get_current_admin
@@ -128,7 +128,7 @@ async def upload_knowledge_document(
 
         if file_extension == ".pdf":
 
-            document = fitz.open(
+            document = pymupdf.open(pdf_path)
                 str(file_path)
             )
 
