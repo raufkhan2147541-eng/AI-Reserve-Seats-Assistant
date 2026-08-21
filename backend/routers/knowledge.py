@@ -128,7 +128,7 @@ async def upload_knowledge_document(
 
         if file_extension == ".pdf":
 
-        document = pymupdf.open(pdf_path)
+            document = pymupdf.open(pdf_path)
                 str(file_path)
             )
 
