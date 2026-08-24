@@ -1,126 +1,128 @@
 import {
   useEffect,
-  useMemo,
   useState,
   type FormEvent,
 } from "react";
-
 import { useNavigate } from "react-router-dom";
 
 // ==========================================
 // API Configuration
 // ==========================================
-
-const API_URL =
-  "https://ai-reserve-seats-assistant.onrender.com";
+const API_URL = "https://ai-reserve-seats-assistant.onrender.com";
 
 // ==========================================
 // Types
 // ==========================================
-
 interface University {
   id: number;
   name: string;
-  university_type?: string | null;
-  province?: string | null;
-  city?: string | null;
-  campus?: string | null;
-  official_website?: string | null;
-  admission_portal?: string | null;
-  hec_recognized: boolean | number;
-  hec_recognition_source?: string | null;
-  description?: string | null;
-  academic_session?: string | null;
-  is_active?: boolean | number;
-  created_at?: string;
-  updated_at?: string;
+  code: string;
+  city: string;
+  province: string;
+  website: string;
+  description: string;
+  is_active: boolean;
 }
 
 interface UniversityFormData {
   name: string;
-  university_type: string;
-  province: string;
+  code: string;
   city: string;
-  campus: string;
-  official_website: string;
-  admission_portal: string;
-  hec_recognized: boolean;
-  hec_recognition_source: string;
+  province: string;
+  website: string;
   description: string;
-  academic_session: string;
   is_active: boolean;
 }
 
-// ==========================================
-// Empty Form
-// ==========================================
+interface UniversityProgram {
+  id: number;
+  university_id: number;
+  program_name: string;
+  program_code: string;
+  degree_level: string;
+  department: string;
+  total_seats: number;
+  reserved_seats: number;
+  fee_per_semester: number;
+  duration_years: number;
+  eligibility_criteria: string;
+  application_deadline?: string;
+  shift: string;
+  is_active: boolean;
+}
 
-const emptyForm: UniversityFormData = {
+interface ProgramFormData {
+  program_name: string;
+  program_code: string;
+  degree_level: string;
+  department: string;
+  total_seats: number;
+  reserved_seats: number;
+  fee_per_semester: number;
+  duration_years: number;
+  eligibility_criteria: string;
+  application_deadline: string;
+  shift: string;
+  is_active: boolean;
+}
+
+const emptyUniversityForm: UniversityFormData = {
   name: "",
-  university_type: "",
-  province: "",
+  code: "",
   city: "",
-  campus: "",
-  official_website: "",
-  admission_portal: "",
-  hec_recognized: true,
-  hec_recognition_source: "",
+  province: "",
+  website: "",
   description: "",
-  academic_session: "",
   is_active: true,
 };
 
-// ==========================================
-// Helper
-// ==========================================
-
-const isTrue = (
-  value: boolean | number | undefined | null
-): boolean => {
-  return value === true || value === 1;
+const emptyProgramForm: ProgramFormData = {
+  program_name: "",
+  program_code: "",
+  degree_level: "BS",
+  department: "",
+  total_seats: 50,
+  reserved_seats: 10,
+  fee_per_semester: 35000,
+  duration_years: 4,
+  eligibility_criteria: "",
+  application_deadline: "",
+  shift: "Morning",
+  is_active: true,
 };
 
 // ==========================================
 // Component
 // ==========================================
-
 const AdminUniversities = () => {
   const navigate = useNavigate();
 
-  // ==========================================
-  // State
-  // ==========================================
-
-  const [universities, setUniversities] = useState<
-    University[]
-  >([]);
-
+  // University States
+  const [universities, setUniversities] = useState<University[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [saving, setSaving] = useState(false);
-
-  const [deletingId, setDeletingId] =
-    useState<number | null>(null);
-
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState("");
-
-  const [successMessage, setSuccessMessage] =
-    useState("");
-
+  const [successMessage, setSuccessMessage] = useState("");
   const [search, setSearch] = useState("");
-
   const [showForm, setShowForm] = useState(false);
+  const [editingUniversity, setEditingUniversity] = useState<University | null>(null);
+  const [formData, setFormData] = useState<UniversityFormData>(emptyUniversityForm);
 
-  const [editingUniversity, setEditingUniversity] =
-    useState<University | null>(null);
-
-  const [formData, setFormData] =
-    useState<UniversityFormData>(emptyForm);
+  // Program States (Modal & Management)
+  const [selectedUniversityForPrograms, setSelectedUniversityForPrograms] = useState<University | null>(null);
+  const [programs, setPrograms] = useState<UniversityProgram[]>([]);
+  const [loadingPrograms, setLoadingPrograms] = useState(false);
+  const [showProgramModal, setShowProgramModal] = useState(false);
+  const [showProgramForm, setShowProgramForm] = useState(false);
+  const [editingProgram, setEditingProgram] = useState<UniversityProgram | null>(null);
+  const [programFormData, setProgramFormData] = useState<ProgramFormData>(emptyProgramForm);
+  const [savingProgram, setSavingProgram] = useState(false);
+  const [deletingProgramId, setDeletingProgramId] = useState<number | null>(null);
 
   // ==========================================
-  // Authentication
+  // Auth Token Handlers
   // ==========================================
-
   const getAdminToken = (): string | null => {
     return (
       localStorage.getItem("admin_access_token") ||
@@ -146,32 +148,26 @@ const AdminUniversities = () => {
   // ==========================================
   // Load Universities
   // ==========================================
-
   const loadUniversities = async () => {
     try {
       setLoading(true);
       setError("");
 
       const token = getAdminToken();
-
       if (!token) {
         navigate("/admin/login");
         return;
       }
 
-      const response = await fetch(
-        `${API_URL}/universities/`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        }
-      );
+      const response = await fetch(`${API_URL}/universities/`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      });
 
       let data: any = null;
-
       try {
         data = await response.json();
       } catch {
@@ -184,395 +180,168 @@ const AdminUniversities = () => {
       }
 
       if (response.status === 403) {
-        setError(
-          "You do not have permission to manage universities."
-        );
+        setError("You do not have permission to manage universities.");
         return;
       }
 
       if (!response.ok) {
-        throw new Error(
-          data?.detail ||
-            data?.message ||
-            "Unable to load universities."
-        );
+        throw new Error(data?.detail || data?.message || "Unable to load universities.");
       }
 
-      const universityData: University[] =
-        Array.isArray(data)
-          ? data
-          : data?.universities ||
-            data?.data ||
-            data?.items ||
-            [];
+      const universityData = Array.isArray(data)
+        ? data
+        : data?.universities || data?.data || data?.items || [];
 
       setUniversities(universityData);
     } catch (error) {
-      console.error(
-        "Load universities error:",
-        error
-      );
-
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Unable to connect to the backend."
-      );
+      console.error("Load universities error:", error);
+      setError(error instanceof Error ? error.message : "Unable to connect to the backend.");
     } finally {
       setLoading(false);
     }
   };
-
-  // ==========================================
-  // Initial Load
-  // ==========================================
 
   useEffect(() => {
     loadUniversities();
   }, []);
 
   // ==========================================
-  // Add University
+  // University Form Handlers
   // ==========================================
-
   const handleAddUniversity = () => {
     setEditingUniversity(null);
-
-    setFormData(emptyForm);
-
+    setFormData(emptyUniversityForm);
     setError("");
-
     setSuccessMessage("");
-
     setShowForm(true);
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // ==========================================
-  // Edit University
-  // ==========================================
-
-  const handleEditUniversity = (
-    university: University
-  ) => {
+  const handleEditUniversity = (university: University) => {
     setEditingUniversity(university);
-
     setFormData({
       name: university.name || "",
-
-      university_type:
-        university.university_type || "",
-
-      province: university.province || "",
-
+      code: university.code || "",
       city: university.city || "",
-
-      campus: university.campus || "",
-
-      official_website:
-        university.official_website || "",
-
-      admission_portal:
-        university.admission_portal || "",
-
-      hec_recognized: isTrue(
-        university.hec_recognized
-      ),
-
-      hec_recognition_source:
-        university.hec_recognition_source || "",
-
-      description:
-        university.description || "",
-
-      academic_session:
-        university.academic_session || "",
-
-      is_active: isTrue(
-        university.is_active ?? true
-      ),
+      province: university.province || "",
+      website: university.website || "",
+      description: university.description || "",
+      is_active: university.is_active !== false,
     });
-
     setError("");
-
     setSuccessMessage("");
-
     setShowForm(true);
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
-
-  // ==========================================
-  // Close Form
-  // ==========================================
 
   const handleCloseForm = () => {
-    if (saving) {
-      return;
-    }
-
+    if (saving) return;
     setShowForm(false);
-
     setEditingUniversity(null);
-
-    setFormData(emptyForm);
+    setFormData(emptyUniversityForm);
   };
 
-  // ==========================================
-  // Form Input Handler
-  // ==========================================
-
-  const handleInputChange = (
-    field: keyof UniversityFormData,
-    value: string | boolean
-  ) => {
-    setFormData((previous) => ({
-      ...previous,
-      [field]: value,
-    }));
+  const handleInputChange = (field: keyof UniversityFormData, value: string | boolean) => {
+    setFormData((previous) => ({ ...previous, [field]: value }));
   };
 
-  // ==========================================
-  // Save University
-  // ==========================================
-
-  const handleSubmit = async (
-    event: FormEvent<HTMLFormElement>
-  ) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
     setError("");
-
     setSuccessMessage("");
 
-    // ========================================
-    // Validation
-    // ========================================
-
-    if (!formData.name.trim()) {
-      setError("University name is required.");
-      return;
-    }
-
-    if (!formData.province.trim()) {
-      setError("Province is required.");
-      return;
-    }
-
-    if (!formData.city.trim()) {
-      setError("City is required.");
+    if (!formData.name.trim() || !formData.code.trim() || !formData.city.trim() || !formData.province.trim()) {
+      setError("Please fill out all required fields.");
       return;
     }
 
     try {
       setSaving(true);
-
       const token = getAdminToken();
-
       if (!token) {
         navigate("/admin/login");
         return;
       }
 
-      const isEditing =
-        editingUniversity !== null;
-
+      const isEditing = editingUniversity !== null;
       const url = isEditing
         ? `${API_URL}/universities/${editingUniversity.id}`
         : `${API_URL}/universities/`;
-
       const method = isEditing ? "PUT" : "POST";
-
-      // ========================================
-      // Request Body
-      // ========================================
-
-      const requestBody = {
-        name: formData.name.trim(),
-
-        university_type:
-          formData.university_type.trim() || null,
-
-        province: formData.province.trim(),
-
-        city: formData.city.trim(),
-
-        campus:
-          formData.campus.trim() || null,
-
-        official_website:
-          formData.official_website.trim() || null,
-
-        admission_portal:
-          formData.admission_portal.trim() || null,
-
-        hec_recognized:
-          formData.hec_recognized,
-
-        hec_recognition_source:
-          formData.hec_recognition_source.trim() ||
-          null,
-
-        description:
-          formData.description.trim() || null,
-
-        academic_session:
-          formData.academic_session.trim() ||
-          null,
-
-        ...(isEditing
-          ? {
-              is_active:
-                formData.is_active,
-            }
-          : {}),
-      };
 
       const response = await fetch(url, {
         method,
-
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: "application/json",
           "Content-Type": "application/json",
         },
-
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          code: formData.code.trim().toUpperCase(),
+          city: formData.city.trim(),
+          province: formData.province.trim(),
+          website: formData.website.trim(),
+          description: formData.description.trim(),
+          is_active: formData.is_active,
+        }),
       });
 
       let data: any = null;
-
       try {
         data = await response.json();
       } catch {
         data = null;
       }
 
-      // ========================================
-      // Unauthorized
-      // ========================================
-
       if (response.status === 401) {
         handleUnauthorized();
         return;
       }
-
-      // ========================================
-      // Forbidden
-      // ========================================
-
       if (response.status === 403) {
-        setError(
-          "You do not have permission to manage universities."
-        );
+        setError("You do not have permission to manage universities.");
         return;
       }
-
-      // ========================================
-      // Validation / Backend Error
-      // ========================================
-
       if (!response.ok) {
-        let message =
-          data?.detail ||
-          data?.message ||
-          "Unable to save university.";
-
-        if (Array.isArray(data?.detail)) {
-          message = data.detail
-            .map(
-              (item: any) =>
-                item?.msg || "Invalid input."
-            )
-            .join(", ");
-        }
-
-        throw new Error(message);
+        throw new Error(data?.detail || data?.message || "Unable to save university.");
       }
 
-      // ========================================
-      // Success
-      // ========================================
-
-      setSuccessMessage(
-        isEditing
-          ? "University updated successfully."
-          : "University added successfully."
-      );
-
+      setSuccessMessage(isEditing ? "University updated successfully." : "University added successfully.");
       setShowForm(false);
-
       setEditingUniversity(null);
-
-      setFormData(emptyForm);
-
+      setFormData(emptyUniversityForm);
       await loadUniversities();
     } catch (error) {
-      console.error(
-        "Save university error:",
-        error
-      );
-
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Unable to save university."
-      );
+      console.error("Save university error:", error);
+      setError(error instanceof Error ? error.message : "Unable to save university.");
     } finally {
       setSaving(false);
     }
   };
 
-  // ==========================================
-  // Delete University
-  // ==========================================
-
-  const handleDeleteUniversity = async (
-    university: University
-  ) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${university.name}"?`
-    );
-
-    if (!confirmed) {
-      return;
-    }
+  const handleDeleteUniversity = async (university: University) => {
+    const confirmed = window.confirm(`Are you sure you want to delete "${university.name}"?`);
+    if (!confirmed) return;
 
     try {
       setDeletingId(university.id);
-
       setError("");
-
       setSuccessMessage("");
-
       const token = getAdminToken();
-
       if (!token) {
         navigate("/admin/login");
         return;
       }
 
-      const response = await fetch(
-        `${API_URL}/universities/${university.id}`,
-        {
-          method: "DELETE",
-
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        }
-      );
+      const response = await fetch(`${API_URL}/universities/${university.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      });
 
       let data: any = null;
-
       try {
         data = await response.json();
       } catch {
@@ -583,186 +352,224 @@ const AdminUniversities = () => {
         handleUnauthorized();
         return;
       }
-
       if (response.status === 403) {
-        setError(
-          "You do not have permission to delete universities."
-        );
+        setError("You do not have permission to delete universities.");
         return;
       }
-
       if (!response.ok) {
-        throw new Error(
-          data?.detail ||
-            data?.message ||
-            "Unable to delete university."
-        );
+        throw new Error(data?.detail || data?.message || "Unable to delete university.");
       }
 
-      setSuccessMessage(
-        "University deleted successfully."
-      );
-
-      setUniversities((previous) =>
-        previous.filter(
-          (item) =>
-            item.id !== university.id
-        )
-      );
+      setSuccessMessage("University deleted successfully.");
+      setUniversities((previous) => previous.filter((item) => item.id !== university.id));
     } catch (error) {
-      console.error(
-        "Delete university error:",
-        error
-      );
-
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Unable to delete university."
-      );
+      console.error("Delete university error:", error);
+      setError(error instanceof Error ? error.message : "Unable to delete university.");
     } finally {
       setDeletingId(null);
     }
   };
 
   // ==========================================
-  // Search
+  // Program Management Handlers
   // ==========================================
+  const handleOpenProgramsModal = async (university: University) => {
+    setSelectedUniversityForPrograms(university);
+    setShowProgramModal(true);
+    setShowProgramForm(false);
+    await loadProgramsForUniversity(university.id);
+  };
 
-  const filteredUniversities = useMemo(() => {
-    const searchText =
-      search.toLowerCase().trim();
+  const loadProgramsForUniversity = async (uniId: number) => {
+    try {
+      setLoadingPrograms(true);
+      const token = getAdminToken();
+      if (!token) return;
 
-    if (!searchText) {
-      return universities;
-    }
+      const response = await fetch(`${API_URL}/universities/${uniId}/programs`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      });
 
-    return universities.filter(
-      (university) => {
-        return (
-          university.name
-            ?.toLowerCase()
-            .includes(searchText) ||
-
-          university.university_type
-            ?.toLowerCase()
-            .includes(searchText) ||
-
-          university.city
-            ?.toLowerCase()
-            .includes(searchText) ||
-
-          university.province
-            ?.toLowerCase()
-            .includes(searchText) ||
-
-          university.campus
-            ?.toLowerCase()
-            .includes(searchText) ||
-
-          university.academic_session
-            ?.toLowerCase()
-            .includes(searchText)
-        );
+      let data: any = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
       }
+
+      if (response.ok) {
+        const progData = Array.isArray(data) ? data : data?.programs || data?.data || [];
+        setPrograms(progData);
+      } else {
+        setPrograms([]);
+      }
+    } catch (err) {
+      console.error("Error loading programs:", err);
+      setPrograms([]);
+    } finally {
+      setLoadingPrograms(false);
+    }
+  };
+
+  const handleAddProgramClick = () => {
+    setEditingProgram(null);
+    setProgramFormData(emptyProgramForm);
+    setShowProgramForm(true);
+  };
+
+  const handleEditProgramClick = (prog: UniversityProgram) => {
+    setEditingProgram(prog);
+    setProgramFormData({
+      program_name: prog.program_name || "",
+      program_code: prog.program_code || "",
+      degree_level: prog.degree_level || "BS",
+      department: prog.department || "",
+      total_seats: prog.total_seats || 50,
+      reserved_seats: prog.reserved_seats || 10,
+      fee_per_semester: prog.fee_per_semester || 35000,
+      duration_years: prog.duration_years || 4,
+      eligibility_criteria: prog.eligibility_criteria || "",
+      application_deadline: prog.application_deadline ? prog.application_deadline.split("T")[0] : "",
+      shift: prog.shift || "Morning",
+      is_active: prog.is_active !== false,
+    });
+    setShowProgramForm(true);
+  };
+
+  const handleProgramSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedUniversityForPrograms) return;
+
+    try {
+      setSavingProgram(true);
+      const token = getAdminToken();
+      if (!token) return;
+
+      const isEditing = editingProgram !== null;
+      // Backend routes: POST /universities/{id}/programs or PUT /programs/{id}
+      const url = isEditing
+        ? `${API_URL}/programs/${editingProgram.id}`
+        : `${API_URL}/universities/${selectedUniversityForPrograms.id}/programs`;
+      const method = isEditing ? "PUT" : "POST";
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          program_name: programFormData.program_name.trim(),
+          program_code: programFormData.program_code.trim().toUpperCase(),
+          degree_level: programFormData.degree_level.trim(),
+          department: programFormData.department.trim(),
+          total_seats: Number(programFormData.total_seats),
+          reserved_seats: Number(programFormData.reserved_seats),
+          fee_per_semester: Number(programFormData.fee_per_semester),
+          duration_years: Number(programFormData.duration_years),
+          eligibility_criteria: programFormData.eligibility_criteria.trim(),
+          application_deadline: programFormData.application_deadline ? new Date(programFormData.application_deadline).toISOString() : null,
+          shift: programFormData.shift.trim(),
+          is_active: programFormData.is_active,
+        }),
+      });
+
+      if (response.ok) {
+        setShowProgramForm(false);
+        setEditingProgram(null);
+        await loadProgramsForUniversity(selectedUniversityForPrograms.id);
+      } else {
+        const errData = await response.json();
+        alert(errData?.detail || "Failed to save program.");
+      }
+    } catch (err) {
+      console.error("Save program error:", err);
+      alert("An error occurred while saving the program.");
+    } finally {
+      setSavingProgram(false);
+    }
+  };
+
+  const handleDeleteProgram = async (progId: number) => {
+    if (!window.confirm("Are you sure you want to delete this program?")) return;
+
+    try {
+      setDeletingProgramId(progId);
+      const token = getAdminToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_URL}/programs/${progId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      });
+
+      if (response.ok && selectedUniversityForPrograms) {
+        setPrograms((prev) => prev.filter((p) => p.id !== progId));
+      } else {
+        alert("Failed to delete program.");
+      }
+    } catch (err) {
+      console.error("Delete program error:", err);
+    } finally {
+      setDeletingProgramId(null);
+    }
+  };
+
+  // Filter Logic
+  const filteredUniversities = universities.filter((university) => {
+    const searchText = search.toLowerCase().trim();
+    if (!searchText) return true;
+    return (
+      university.name?.toLowerCase().includes(searchText) ||
+      university.code?.toLowerCase().includes(searchText) ||
+      university.city?.toLowerCase().includes(searchText) ||
+      university.province?.toLowerCase().includes(searchText)
     );
-  }, [universities, search]);
-
-  // ==========================================
-  // Statistics
-  // ==========================================
-
-  const activeUniversities =
-    universities.filter((university) =>
-      isTrue(university.is_active ?? true)
-    ).length;
-
-  const hecRecognizedUniversities =
-    universities.filter((university) =>
-      isTrue(university.hec_recognized)
-    ).length;
-
-  // ==========================================
-  // Render
-  // ==========================================
+  });
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
-
-      {/* ======================================
-          Header
-      ====================================== */}
-
+      {/* Header */}
       <header className="border-b border-slate-800 bg-slate-950">
-
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-
           <div className="flex items-center gap-3">
-
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600/20 text-2xl">
               🎓
             </div>
-
             <div>
-
-              <h1 className="font-bold">
-                Directorate Reserve Seats
-              </h1>
-
-              <p className="text-xs text-slate-400">
-                University Management
-              </p>
-
+              <h1 className="font-bold">Directorate Reserve Seats</h1>
+              <p className="text-xs text-slate-400">University & Programs Management</p>
             </div>
-
           </div>
-
           <button
             type="button"
-            onClick={() =>
-              navigate("/admin/dashboard")
-            }
+            onClick={() => navigate("/admin/dashboard")}
             className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white"
           >
             ← Dashboard
           </button>
-
         </div>
-
       </header>
 
-      {/* ======================================
-          Main
-      ====================================== */}
-
+      {/* Main Container */}
       <main className="mx-auto max-w-7xl px-6 py-10">
-
-        {/* ====================================
-            Page Heading
-        ==================================== */}
-
         <section>
-
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-
             <div>
-
-              <p className="text-sm font-semibold text-indigo-400">
-                Administration
-              </p>
-
-              <h2 className="mt-2 text-3xl font-bold">
-                Universities Management
-              </h2>
-
+              <p className="text-sm font-semibold text-indigo-400">Administration</p>
+              <h2 className="mt-2 text-3xl font-bold">Universities & Programs Management</h2>
               <p className="mt-3 max-w-3xl text-slate-400">
-                Add, edit, delete and manage official
-                university information used by the
-                Directorate Reserve Seats system.
+                Manage official universities, fee structures, total seats, shifts, and departmental degree offerings.
               </p>
-
             </div>
-
             <button
               type="button"
               onClick={handleAddUniversity}
@@ -770,105 +577,48 @@ const AdminUniversities = () => {
             >
               + Add University
             </button>
-
           </div>
-
         </section>
 
-        {/* ====================================
-            Error
-        ==================================== */}
-
+        {/* Error Alert */}
         {error && (
-
           <div className="mt-8 rounded-xl border border-red-800 bg-red-950/40 p-5">
-
             <div className="flex items-start justify-between gap-4">
-
               <div>
-
-                <p className="font-semibold text-red-300">
-                  Error
-                </p>
-
-                <p className="mt-1 text-sm text-red-400">
-                  {error}
-                </p>
-
+                <p className="font-semibold text-red-300">Error</p>
+                <p className="mt-1 text-sm text-red-400">{error}</p>
               </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setError("")
-                }
-                className="text-red-400 hover:text-red-200"
-              >
+              <button type="button" onClick={() => setError("")} className="text-red-400 hover:text-red-200">
                 ✕
               </button>
-
             </div>
-
           </div>
-
         )}
 
-        {/* ====================================
-            Success
-        ==================================== */}
-
+        {/* Success Alert */}
         {successMessage && (
-
           <div className="mt-8 rounded-xl border border-green-800 bg-green-950/40 p-5">
-
             <div className="flex items-center justify-between gap-4">
-
-              <p className="text-sm text-green-400">
-                ✓ {successMessage}
-              </p>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setSuccessMessage("")
-                }
-                className="text-green-400 hover:text-green-200"
-              >
+              <p className="text-sm text-green-400">✓ {successMessage}</p>
+              <button type="button" onClick={() => setSuccessMessage("")} className="text-green-400 hover:text-green-200">
                 ✕
               </button>
-
             </div>
-
           </div>
-
         )}
 
-        {/* ====================================
-            Add / Edit Form
-        ==================================== */}
-
+        {/* Add / Edit University Form Section */}
         {showForm && (
-
           <section className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-7">
-
             <div className="flex items-center justify-between">
-
               <div>
-
                 <p className="text-sm font-semibold text-indigo-400">
-                  {editingUniversity
-                    ? "Edit University"
-                    : "New University"}
+                  {editingUniversity ? "Edit University" : "New University"}
                 </p>
-
                 <h3 className="mt-1 text-xl font-bold">
-                  {editingUniversity
-                    ? "Update University Information"
-                    : "Add University Information"}
+                  {editingUniversity ? "Update University Information" : "Add University Information"}
                 </h3>
-
               </div>
-
               <button
                 type="button"
                 onClick={handleCloseForm}
@@ -877,387 +627,106 @@ const AdminUniversities = () => {
               >
                 ✕
               </button>
-
             </div>
 
-            <form
-              onSubmit={handleSubmit}
-              className="mt-7"
-            >
-
+            <form onSubmit={handleSubmit} className="mt-7">
               <div className="grid gap-5 md:grid-cols-2">
-
-                {/* University Name */}
-
-                <div className="md:col-span-2">
-
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    University Name *
-                  </label>
-
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-300">University Name *</label>
                   <input
                     type="text"
                     value={formData.name}
-                    onChange={(event) =>
-                      handleInputChange(
-                        "name",
-                        event.target.value
-                      )
-                    }
+                    onChange={(event) => handleInputChange("name", event.target.value)}
                     placeholder="University of Okara"
                     disabled={saving}
                     required
                     className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                   />
-
                 </div>
-
-                {/* University Type */}
-
                 <div>
-
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    University Type
-                  </label>
-
-                  <select
-                    value={formData.university_type}
-                    onChange={(event) =>
-                      handleInputChange(
-                        "university_type",
-                        event.target.value
-                      )
-                    }
-                    disabled={saving}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
-                  >
-                    <option value="">
-                      Select Type
-                    </option>
-
-                    <option value="Public">
-                      Public
-                    </option>
-
-                    <option value="Private">
-                      Private
-                    </option>
-
-                    <option value="Government">
-                      Government
-                    </option>
-
-                    <option value="Semi-Government">
-                      Semi-Government
-                    </option>
-                  </select>
-
-                </div>
-
-                {/* Academic Session */}
-
-                <div>
-
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    Academic Session
-                  </label>
-
+                  <label className="mb-2 block text-sm font-medium text-slate-300">University Code *</label>
                   <input
                     type="text"
-                    value={
-                      formData.academic_session
-                    }
-                    onChange={(event) =>
-                      handleInputChange(
-                        "academic_session",
-                        event.target.value
-                      )
-                    }
-                    placeholder="2026-27"
-                    disabled={saving}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
-                  />
-
-                </div>
-
-                {/* Province */}
-
-                <div>
-
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    Province *
-                  </label>
-
-                  <input
-                    type="text"
-                    value={formData.province}
-                    onChange={(event) =>
-                      handleInputChange(
-                        "province",
-                        event.target.value
-                      )
-                    }
-                    placeholder="Punjab"
+                    value={formData.code}
+                    onChange={(event) => handleInputChange("code", event.target.value)}
+                    placeholder="UO"
                     disabled={saving}
                     required
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-sm uppercase text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                   />
-
                 </div>
-
-                {/* City */}
-
                 <div>
-
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    City *
-                  </label>
-
+                  <label className="mb-2 block text-sm font-medium text-slate-300">City *</label>
                   <input
                     type="text"
                     value={formData.city}
-                    onChange={(event) =>
-                      handleInputChange(
-                        "city",
-                        event.target.value
-                      )
-                    }
+                    onChange={(event) => handleInputChange("city", event.target.value)}
                     placeholder="Okara"
                     disabled={saving}
                     required
                     className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                   />
-
                 </div>
-
-                {/* Campus */}
-
-                <div className="md:col-span-2">
-
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    Campus
-                  </label>
-
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-300">Province *</label>
                   <input
                     type="text"
-                    value={formData.campus}
-                    onChange={(event) =>
-                      handleInputChange(
-                        "campus",
-                        event.target.value
-                      )
-                    }
-                    placeholder="Main Campus"
+                    value={formData.province}
+                    onChange={(event) => handleInputChange("province", event.target.value)}
+                    placeholder="Punjab"
                     disabled={saving}
+                    required
                     className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                   />
-
                 </div>
-
-                {/* Official Website */}
-
-                <div>
-
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    Official Website
-                  </label>
-
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm font-medium text-slate-300">Official Website</label>
                   <input
                     type="url"
-                    value={
-                      formData.official_website
-                    }
-                    onChange={(event) =>
-                      handleInputChange(
-                        "official_website",
-                        event.target.value
-                      )
-                    }
+                    value={formData.website}
+                    onChange={(event) => handleInputChange("website", event.target.value)}
                     placeholder="https://example.edu.pk"
                     disabled={saving}
                     className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                   />
-
                 </div>
-
-                {/* Admission Portal */}
-
-                <div>
-
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    Admission Portal
-                  </label>
-
-                  <input
-                    type="url"
-                    value={
-                      formData.admission_portal
-                    }
-                    onChange={(event) =>
-                      handleInputChange(
-                        "admission_portal",
-                        event.target.value
-                      )
-                    }
-                    placeholder="https://admissions.example.edu.pk"
-                    disabled={saving}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
-                  />
-
-                </div>
-
-                {/* HEC Recognition Source */}
-
                 <div className="md:col-span-2">
-
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    HEC Recognition Source
-                  </label>
-
-                  <input
-                    type="url"
-                    value={
-                      formData.hec_recognition_source
-                    }
-                    onChange={(event) =>
-                      handleInputChange(
-                        "hec_recognition_source",
-                        event.target.value
-                      )
-                    }
-                    placeholder="https://hec.gov.pk/..."
-                    disabled={saving}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
-                  />
-
-                </div>
-
-                {/* Description */}
-
-                <div className="md:col-span-2">
-
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    Description
-                  </label>
-
+                  <label className="mb-2 block text-sm font-medium text-slate-300">Description</label>
                   <textarea
                     value={formData.description}
-                    onChange={(event) =>
-                      handleInputChange(
-                        "description",
-                        event.target.value
-                      )
-                    }
+                    onChange={(event) => handleInputChange("description", event.target.value)}
                     placeholder="Enter official university information..."
-                    rows={5}
+                    rows={4}
                     disabled={saving}
                     className="w-full resize-none rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                   />
-
                 </div>
-
               </div>
 
-              {/* ==================================
-                  HEC + Active Status
-              ================================== */}
-
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
-
-                {/* HEC */}
-
-                <div className="rounded-lg border border-slate-800 bg-slate-950 p-4">
-
-                  <label className="flex cursor-pointer items-center gap-3">
-
-                    <input
-                      type="checkbox"
-                      checked={
-                        formData.hec_recognized
-                      }
-                      onChange={(event) =>
-                        handleInputChange(
-                          "hec_recognized",
-                          event.target.checked
-                        )
-                      }
-                      disabled={saving}
-                      className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-indigo-500"
-                    />
-
-                    <div>
-
-                      <p className="text-sm font-medium text-white">
-                        HEC Recognized
-                      </p>
-
-                      <p className="text-xs text-slate-500">
-                        Mark this university as
-                        recognized by HEC.
-                      </p>
-
-                    </div>
-
-                  </label>
-
-                </div>
-
-                {/* Active */}
-
-                <div className="rounded-lg border border-slate-800 bg-slate-950 p-4">
-
-                  <label className="flex cursor-pointer items-center gap-3">
-
-                    <input
-                      type="checkbox"
-                      checked={
-                        formData.is_active
-                      }
-                      onChange={(event) =>
-                        handleInputChange(
-                          "is_active",
-                          event.target.checked
-                        )
-                      }
-                      disabled={saving}
-                      className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-indigo-500"
-                    />
-
-                    <div>
-
-                      <p className="text-sm font-medium text-white">
-                        Active University
-                      </p>
-
-                      <p className="text-xs text-slate-500">
-                        Active universities can be
-                        used by the student system.
-                      </p>
-
-                    </div>
-
-                  </label>
-
-                </div>
-
+              <div className="mt-5 rounded-lg border border-slate-800 bg-slate-950 p-4">
+                <label className="flex cursor-pointer items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_active}
+                    onChange={(event) => handleInputChange("is_active", event.target.checked)}
+                    disabled={saving}
+                    className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-white">Active University</p>
+                    <p className="text-xs text-slate-500">Active universities can be used by the student system.</p>
+                  </div>
+                </label>
               </div>
-
-              {/* Form Actions */}
 
               <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-
                 <button
                   type="submit"
                   disabled={saving}
                   className="rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {saving
-                    ? "Saving..."
-                    : editingUniversity
-                    ? "Update University"
-                    : "Add University"}
+                  {saving ? "Saving..." : editingUniversity ? "Update University" : "Add University"}
                 </button>
-
                 <button
                   type="button"
                   onClick={handleCloseForm}
@@ -1266,396 +735,405 @@ const AdminUniversities = () => {
                 >
                   Cancel
                 </button>
-
               </div>
-
             </form>
-
           </section>
-
         )}
 
-        {/* ====================================
-            Statistics
-        ==================================== */}
-
+        {/* Search & Stats */}
         <section className="mt-8">
-
-          <div className="grid gap-5 md:grid-cols-4">
-
-            {/* Total */}
-
+          <div className="grid gap-5 md:grid-cols-3">
             <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-
-              <p className="text-sm text-slate-400">
-                Total Universities
-              </p>
-
-              <p className="mt-2 text-3xl font-bold">
-                {universities.length}
-              </p>
-
+              <p className="text-sm text-slate-400">Total Universities</p>
+              <p className="mt-2 text-3xl font-bold">{universities.length}</p>
             </div>
-
-            {/* Active */}
-
             <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-
-              <p className="text-sm text-slate-400">
-                Active Universities
-              </p>
-
+              <p className="text-sm text-slate-400">Active Universities</p>
               <p className="mt-2 text-3xl font-bold text-green-400">
-                {activeUniversities}
+                {universities.filter((u) => u.is_active).length}
               </p>
-
             </div>
-
-            {/* HEC */}
-
             <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-
-              <p className="text-sm text-slate-400">
-                HEC Recognized
-              </p>
-
-              <p className="mt-2 text-3xl font-bold text-blue-400">
-                {hecRecognizedUniversities}
-              </p>
-
+              <p className="text-sm text-slate-400">Search Results</p>
+              <p className="mt-2 text-3xl font-bold text-indigo-400">{filteredUniversities.length}</p>
             </div>
-
-            {/* Search Results */}
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-
-              <p className="text-sm text-slate-400">
-                Search Results
-              </p>
-
-              <p className="mt-2 text-3xl font-bold text-indigo-400">
-                {filteredUniversities.length}
-              </p>
-
-            </div>
-
           </div>
 
-          {/* Search */}
-
           <div className="mt-6">
-
             <input
               type="text"
               value={search}
-              onChange={(event) =>
-                setSearch(event.target.value)
-              }
-              placeholder="Search by university, type, city, province, campus or session..."
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search by university name, code, city or province..."
               className="w-full rounded-xl border border-slate-700 bg-slate-900 px-5 py-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             />
-
           </div>
-
         </section>
 
-        {/* ====================================
-            Universities List
-        ==================================== */}
-
+        {/* Universities List Table */}
         <section className="mt-6">
-
           {loading ? (
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-10">
-
-              <div className="flex items-center justify-center gap-3">
-
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent" />
-
-                <p className="text-sm text-indigo-300">
-                  Loading universities...
-                </p>
-
-              </div>
-
-            </div>
-
-          ) : filteredUniversities.length === 0 ? (
-
             <div className="rounded-2xl border border-slate-800 bg-slate-900 p-10 text-center">
-
-              <div className="text-4xl">
-                🎓
+              <div className="flex items-center justify-center gap-3">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent" />
+                <p className="text-sm text-indigo-300">Loading universities...</p>
               </div>
-
-              <h3 className="mt-4 text-lg font-bold">
-                No Universities Found
-              </h3>
-
+            </div>
+          ) : filteredUniversities.length === 0 ? (
+            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-10 text-center">
+              <div className="text-4xl">🎓</div>
+              <h3 className="mt-4 text-lg font-bold">No Universities Found</h3>
               <p className="mt-2 text-sm text-slate-400">
-                {search
-                  ? "No university matches your search."
-                  : "No universities have been added yet."}
+                {search ? "No university matches your search." : "No universities have been added yet."}
               </p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[950px]">
+                  <thead className="border-b border-slate-800 bg-slate-950">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">University</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Code</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Location</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Status</th>
+                      <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {filteredUniversities.map((university) => (
+                      <tr key={university.id} className="transition hover:bg-slate-800/40">
+                        <td className="px-6 py-5">
+                          <div className="flex items-start gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-600/20 text-lg">
+                              🎓
+                            </div>
+                            <div>
+                              <p className="font-semibold text-white">{university.name}</p>
+                              {university.description && (
+                                <p className="mt-1 max-w-md truncate text-xs text-slate-500">{university.description}</p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-5">
+                          <span className="rounded-md bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-300">
+                            {university.code}
+                          </span>
+                        </td>
+                        <td className="px-6 py-5">
+                          <p className="text-sm text-slate-300">{university.city}</p>
+                          <p className="mt-1 text-xs text-slate-500">{university.province}</p>
+                        </td>
+                        <td className="px-6 py-5">
+                          {university.is_active ? (
+                            <span className="inline-flex items-center gap-2 rounded-full bg-green-950/50 px-3 py-1 text-xs font-semibold text-green-400">
+                              <span className="h-1.5 w-1.5 rounded-full bg-green-400" /> Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-2 rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-500">
+                              <span className="h-1.5 w-1.5 rounded-full bg-slate-500" /> Inactive
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-5">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenProgramsModal(university)}
+                              className="rounded-lg bg-indigo-600/20 border border-indigo-500/40 px-3 py-2 text-xs font-semibold text-indigo-300 transition hover:bg-indigo-600 hover:text-white"
+                            >
+                              Programs
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleEditUniversity(university)}
+                              disabled={deletingId === university.id}
+                              className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white disabled:opacity-50"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUniversity(university)}
+                              disabled={deletingId === university.id}
+                              className="rounded-lg border border-red-900/70 px-3 py-2 text-xs font-semibold text-red-400 transition hover:bg-red-950/50 hover:text-red-300 disabled:opacity-50"
+                            >
+                              {deletingId === university.id ? "Deleting..." : "Delete"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </section>
+      </main>
 
-              {!search && (
-
-                <button
-                  type="button"
-                  onClick={handleAddUniversity}
-                  className="mt-5 rounded-lg bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700"
-                >
-                  + Add First University
-                </button>
-
-              )}
-
+      {/* ========================================== */}
+      {/* PROGRAMS MODAL MANAGER                    */}
+      {/* ========================================== */}
+      {showProgramModal && selectedUniversityForPrograms && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-indigo-400">Department & Degree Management</p>
+                <h3 className="text-xl font-bold">{selectedUniversityForPrograms.name} — Programs</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowProgramModal(false)}
+                className="rounded-lg border border-slate-700 px-3 py-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-white"
+              >
+                ✕ Close
+              </button>
             </div>
 
-          ) : (
+            <div className="mt-6 flex items-center justify-between">
+              <p className="text-sm text-slate-400">Total Programs Listed: {programs.length}</p>
+              <button
+                type="button"
+                onClick={handleAddProgramClick}
+                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+              >
+                + Add Program
+              </button>
+            </div>
 
-            <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+            {/* Program Form Drawer/Section Inside Modal */}
+            {showProgramForm && (
+              <div className="mt-6 rounded-xl border border-indigo-500/30 bg-slate-950 p-5">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h4 className="font-semibold text-indigo-300">
+                    {editingProgram ? "Edit Program Details" : "Add New Program"}
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setShowProgramForm(false)}
+                    className="text-xs text-slate-400 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <form onSubmit={handleProgramSubmit} className="mt-4 grid gap-4 md:grid-cols-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-300">Program Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={programFormData.program_name}
+                      onChange={(e) => setProgramFormData({ ...programFormData, program_name: e.target.value })}
+                      placeholder="BS Software Engineering"
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-300">Program Code *</label>
+                    <input
+                      type="text"
+                      required
+                      value={programFormData.program_code}
+                      onChange={(e) => setProgramFormData({ ...programFormData, program_code: e.target.value })}
+                      placeholder="BSSE"
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm uppercase text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-300">Degree Level</label>
+                    <input
+                      type="text"
+                      value={programFormData.degree_level}
+                      onChange={(e) => setProgramFormData({ ...programFormData, degree_level: e.target.value })}
+                      placeholder="BS / MS / PhD"
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-300">Department</label>
+                    <input
+                      type="text"
+                      value={programFormData.department}
+                      onChange={(e) => setProgramFormData({ ...programFormData, department: e.target.value })}
+                      placeholder="Computer Science"
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-300">Total Seats</label>
+                    <input
+                      type="number"
+                      value={programFormData.total_seats}
+                      onChange={(e) => setProgramFormData({ ...programFormData, total_seats: Number(e.target.value) })}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-300">Reserved Seats</label>
+                    <input
+                      type="number"
+                      value={programFormData.reserved_seats}
+                      onChange={(e) => setProgramFormData({ ...programFormData, reserved_seats: Number(e.target.value) })}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-300">Fee Per Semester (PKR)</label>
+                    <input
+                      type="number"
+                      value={programFormData.fee_per_semester}
+                      onChange={(e) => setProgramFormData({ ...programFormData, fee_per_semester: Number(e.target.value) })}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-300">Duration (Years)</label>
+                    <input
+                      type="number"
+                      value={programFormData.duration_years}
+                      onChange={(e) => setProgramFormData({ ...programFormData, duration_years: Number(e.target.value) })}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-300">Shift</label>
+                    <select
+                      value={programFormData.shift}
+                      onChange={(e) => setProgramFormData({ ...programFormData, shift: e.target.value })}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    >
+                      <option value="Morning">Morning</option>
+                      <option value="Evening">Evening</option>
+                      <option value="Both">Both</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-slate-300">Eligibility Criteria</label>
+                    <input
+                      type="text"
+                      value={programFormData.eligibility_criteria}
+                      onChange={(e) => setProgramFormData({ ...programFormData, eligibility_criteria: e.target.value })}
+                      placeholder="Intermediate with 50% marks"
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-300">Application Deadline</label>
+                    <input
+                      type="date"
+                      value={programFormData.application_deadline}
+                      onChange={(e) => setProgramFormData({ ...programFormData, application_deadline: e.target.value })}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 md:col-span-3">
+                    <input
+                      type="checkbox"
+                      id="prog_active"
+                      checked={programFormData.is_active}
+                      onChange={(e) => setProgramFormData({ ...programFormData, is_active: e.target.checked })}
+                      className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-indigo-600"
+                    />
+                    <label htmlFor="prog_active" className="text-xs font-medium text-slate-300">Program Active</label>
+                  </div>
+                  <div className="md:col-span-3 flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowProgramForm(false)}
+                      className="rounded-lg border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingProgram}
+                      className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      {savingProgram ? "Saving..." : editingProgram ? "Update Program" : "Save Program"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
 
-              <div className="overflow-x-auto">
-
-                <table className="w-full min-w-[1100px]">
-
-                  <thead className="border-b border-slate-800 bg-slate-950">
-
-                    <tr>
-
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                        University
-                      </th>
-
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                        Type
-                      </th>
-
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                        Location
-                      </th>
-
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                        HEC
-                      </th>
-
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                        Status
-                      </th>
-
-                      <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
-                        Actions
-                      </th>
-
-                    </tr>
-
-                  </thead>
-
-                  <tbody className="divide-y divide-slate-800">
-
-                    {filteredUniversities.map(
-                      (university) => (
-
-                        <tr
-                          key={university.id}
-                          className="transition hover:bg-slate-800/40"
-                        >
-
-                          {/* University */}
-
-                          <td className="px-6 py-5">
-
-                            <div className="flex items-start gap-3">
-
-                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-600/20 text-lg">
-                                🎓
-                              </div>
-
-                              <div>
-
-                                <p className="font-semibold text-white">
-                                  {university.name}
-                                </p>
-
-                                {university.campus && (
-
-                                  <p className="mt-1 text-xs text-slate-500">
-                                    {university.campus}
-                                  </p>
-
-                                )}
-
-                                {university.academic_session && (
-
-                                  <p className="mt-1 text-xs text-slate-600">
-                                    Session:{" "}
-                                    {
-                                      university.academic_session
-                                    }
-                                  </p>
-
-                                )}
-
-                              </div>
-
-                            </div>
-
+            {/* Programs Table */}
+            <div className="mt-6">
+              {loadingPrograms ? (
+                <div className="py-10 text-center text-sm text-indigo-300">Loading programs...</div>
+              ) : programs.length === 0 ? (
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-8 text-center text-sm text-slate-400">
+                  No programs found for this university. Add one using the button above.
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-slate-800">
+                  <table className="w-full min-w-[800px] text-left text-sm">
+                    <thead className="bg-slate-950 text-xs uppercase text-slate-400 border-b border-slate-800">
+                      <tr>
+                        <th className="px-4 py-3">Program</th>
+                        <th className="px-4 py-3">Code / Shift</th>
+                        <th className="px-4 py-3">Seats (Total/Res)</th>
+                        <th className="px-4 py-3">Fee / Sem</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 bg-slate-900/50">
+                      {programs.map((prog) => (
+                        <tr key={prog.id} className="hover:bg-slate-800/40">
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-white">{prog.program_name}</p>
+                            <p className="text-xs text-slate-500">{prog.department || prog.degree_level}</p>
                           </td>
-
-                          {/* Type */}
-
-                          <td className="px-6 py-5">
-
-                            <span className="rounded-md bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-300">
-                              {university.university_type ||
-                                "Not specified"}
-                            </span>
-
+                          <td className="px-4 py-3">
+                            <span className="rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-300">{prog.program_code}</span>
+                            <p className="mt-1 text-xs text-slate-500">{prog.shift}</p>
                           </td>
-
-                          {/* Location */}
-
-                          <td className="px-6 py-5">
-
-                            <p className="text-sm text-slate-300">
-                              {university.city ||
-                                "N/A"}
-                            </p>
-
-                            <p className="mt-1 text-xs text-slate-500">
-                              {university.province ||
-                                "N/A"}
-                            </p>
-
+                          <td className="px-4 py-3">
+                            <p className="text-slate-300">{prog.total_seats} seats</p>
+                            <p className="text-xs text-indigo-400">Reserved: {prog.reserved_seats}</p>
                           </td>
-
-                          {/* HEC */}
-
-                          <td className="px-6 py-5">
-
-                            {isTrue(
-                              university.hec_recognized
-                            ) ? (
-
-                              <span className="inline-flex items-center gap-2 rounded-full bg-blue-950/50 px-3 py-1 text-xs font-semibold text-blue-400">
-
-                                <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-
-                                Recognized
-
-                              </span>
-
+                          <td className="px-4 py-3 font-medium text-green-400">
+                            PKR {prog.fee_per_semester?.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3">
+                            {prog.is_active ? (
+                              <span className="rounded-full bg-green-950/60 px-2.5 py-0.5 text-xs font-semibold text-green-400">Active</span>
                             ) : (
-
-                              <span className="inline-flex items-center gap-2 rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-500">
-
-                                <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
-
-                                Not Verified
-
-                              </span>
-
+                              <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-slate-500">Inactive</span>
                             )}
-
                           </td>
-
-                          {/* Status */}
-
-                          <td className="px-6 py-5">
-
-                            {isTrue(
-                              university.is_active ??
-                                true
-                            ) ? (
-
-                              <span className="inline-flex items-center gap-2 rounded-full bg-green-950/50 px-3 py-1 text-xs font-semibold text-green-400">
-
-                                <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
-
-                                Active
-
-                              </span>
-
-                            ) : (
-
-                              <span className="inline-flex items-center gap-2 rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-500">
-
-                                <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
-
-                                Inactive
-
-                              </span>
-
-                            )}
-
-                          </td>
-
-                          {/* Actions */}
-
-                          <td className="px-6 py-5">
-
+                          <td className="px-4 py-3 text-right">
                             <div className="flex justify-end gap-2">
-
                               <button
                                 type="button"
-                                onClick={() =>
-                                  handleEditUniversity(
-                                    university
-                                  )
-                                }
-                                disabled={
-                                  deletingId ===
-                                  university.id
-                                }
-                                className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white disabled:opacity-50"
+                                onClick={() => handleEditProgramClick(prog)}
+                                className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-800 hover:text-white"
                               >
                                 Edit
                               </button>
-
                               <button
                                 type="button"
-                                onClick={() =>
-                                  handleDeleteUniversity(
-                                    university
-                                  )
-                                }
-                                disabled={
-                                  deletingId ===
-                                  university.id
-                                }
-                                className="rounded-lg border border-red-900/70 px-3 py-2 text-xs font-semibold text-red-400 transition hover:bg-red-950/50 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+                                onClick={() => handleDeleteProgram(prog.id)}
+                                disabled={deletingProgramId === prog.id}
+                                className="rounded border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50 disabled:opacity-50"
                               >
-                                {deletingId ===
-                                university.id
-                                  ? "Deleting..."
-                                  : "Delete"}
+                                {deletingProgramId === prog.id ? "..." : "Delete"}
                               </button>
-
                             </div>
-
                           </td>
-
                         </tr>
-
-                      )
-                    )}
-
-                  </tbody>
-
-                </table>
-
-              </div>
-
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-
-          )}
-
-        </section>
-
-      </main>
-
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 // ==========================================
@@ -13,6 +12,7 @@ import ResetPassword from "../pages/ResetPassword";
 
 import StudentDashboard from "../pages/StudentDashboard";
 import StudentChat from "../pages/StudentChat";
+import StudentUniversityDetails from "../pages/StudentUniversityDetails";
 
 // ==========================================
 // Admin Pages
@@ -92,6 +92,15 @@ const AppRoutes = () => {
         />
 
         {/* ==========================================
+            Student University Details
+        ========================================== */}
+
+        <Route
+          path="/student/universities/:universityId"
+          element={<StudentUniversityDetails />}
+        />
+
+        {/* ==========================================
             AI Student Assistant
         ========================================== */}
 
@@ -143,4 +152,3 @@ const AppRoutes = () => {
 };
 
 export default AppRoutes;
-
