@@ -6,14 +6,14 @@ from database import get_connection
 
 
 router = APIRouter(
-    prefix="/university-programs",
+    prefix="/universities",
     tags=["University Programs"],
 )
 
 
-# ==========================================
-# Program Create Request
-# ==========================================
+# ============================================================
+# PROGRAM CREATE REQUEST
+# ============================================================
 
 class ProgramCreateRequest(BaseModel):
     university_id: int
@@ -26,42 +26,52 @@ class ProgramCreateRequest(BaseModel):
     degree_level: Optional[str] = None
     department: Optional[str] = None
     campus: Optional[str] = None
+
     duration: Optional[str] = None
     study_mode: Optional[str] = None
+
     eligibility: Optional[str] = None
 
     entry_test_required: bool = False
 
     admission_status: Optional[str] = None
     academic_session: Optional[str] = None
+
     source_url: Optional[str] = None
+    last_verified: Optional[str] = None
 
 
-# ==========================================
-# Program Update Request
-# ==========================================
+# ============================================================
+# PROGRAM UPDATE REQUEST
+# ============================================================
 
 class ProgramUpdateRequest(BaseModel):
     program_name: Optional[str] = None
+
     degree_level: Optional[str] = None
     department: Optional[str] = None
     campus: Optional[str] = None
+
     duration: Optional[str] = None
     study_mode: Optional[str] = None
+
     eligibility: Optional[str] = None
 
     entry_test_required: Optional[bool] = None
 
     admission_status: Optional[str] = None
     academic_session: Optional[str] = None
+
     source_url: Optional[str] = None
+    last_verified: Optional[str] = None
 
 
-# ==========================================
-# Create University Program
-# ==========================================
+# ============================================================
+# CREATE UNIVERSITY PROGRAM
+# POST /universities/programs
+# ============================================================
 
-@router.post("/")
+@router.post("/programs")
 async def create_program(
     request: ProgramCreateRequest,
 ):
@@ -76,505 +86,536 @@ async def create_program(
     connection = get_connection()
     cursor = connection.cursor()
 
-    # --------------------------------------
-    # Check University
-    # --------------------------------------
+    try:
 
-    university = cursor.execute(
-        """
-        SELECT id, name
-        FROM universities
-        WHERE id = ?
-        """,
-        (request.university_id,),
-    ).fetchone()
+        # ----------------------------------------------------
+        # Check University
+        # ----------------------------------------------------
 
-    if not university:
-        connection.close()
+        university = cursor.execute(
+            """
+            SELECT id, name
+            FROM universities
+            WHERE id = ?
+            """,
+            (request.university_id,),
+        ).fetchone()
 
-        raise HTTPException(
-            status_code=404,
-            detail="University not found.",
-        )
+        if not university:
+            raise HTTPException(
+                status_code=404,
+                detail="University not found.",
+            )
 
-    # --------------------------------------
-    # Check Duplicate Program
-    # --------------------------------------
+        # ----------------------------------------------------
+        # Check Duplicate Program
+        # ----------------------------------------------------
 
-    existing = cursor.execute(
-        """
-        SELECT id
-        FROM university_programs
-        WHERE university_id = ?
-        AND LOWER(program_name) = LOWER(?)
-        """,
-        (
-            request.university_id,
-            program_name,
-        ),
-    ).fetchone()
+        existing = cursor.execute(
+            """
+            SELECT id
+            FROM university_programs
+            WHERE university_id = ?
+            AND LOWER(program_name) = LOWER(?)
+            """,
+            (
+                request.university_id,
+                program_name,
+            ),
+        ).fetchone()
 
-    if existing:
-        connection.close()
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "This program already exists "
+                    "for this university."
+                ),
+            )
 
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "This program already exists "
-                "for this university."
+        # ----------------------------------------------------
+        # Insert Program
+        # ----------------------------------------------------
+
+        cursor.execute(
+            """
+            INSERT INTO university_programs (
+                university_id,
+                program_name,
+                degree_level,
+                department,
+                campus,
+                duration,
+                study_mode,
+                eligibility,
+                entry_test_required,
+                admission_status,
+                academic_session,
+                source_url,
+                last_verified
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                request.university_id,
+                program_name,
+                request.degree_level,
+                request.department,
+                request.campus,
+                request.duration,
+                request.study_mode,
+                request.eligibility,
+                int(request.entry_test_required),
+                request.admission_status,
+                request.academic_session,
+                request.source_url,
+                request.last_verified,
             ),
         )
 
-    # --------------------------------------
-    # Insert Program
-    # --------------------------------------
+        connection.commit()
 
-    cursor.execute(
-        """
-        INSERT INTO university_programs (
-            university_id,
-            program_name,
-            degree_level,
-            department,
-            campus,
-            duration,
-            study_mode,
-            eligibility,
-            entry_test_required,
-            admission_status,
-            academic_session,
-            source_url
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            request.university_id,
-            program_name,
-            request.degree_level,
-            request.department,
-            request.campus,
-            request.duration,
-            request.study_mode,
-            request.eligibility,
-            int(request.entry_test_required),
-            request.admission_status,
-            request.academic_session,
-            request.source_url,
-        ),
-    )
+        program_id = cursor.lastrowid
 
-    connection.commit()
+        # ----------------------------------------------------
+        # Get Created Program
+        # ----------------------------------------------------
 
-    program_id = cursor.lastrowid
+        program = cursor.execute(
+            """
+            SELECT
+                p.*,
+                u.name AS university_name
+            FROM university_programs p
+            INNER JOIN universities u
+                ON p.university_id = u.id
+            WHERE p.id = ?
+            """,
+            (program_id,),
+        ).fetchone()
 
-    # --------------------------------------
-    # Get Created Program
-    # --------------------------------------
+        return {
+            "success": True,
+            "message": "University program added successfully.",
+            "program": dict(program),
+        }
 
-    program = cursor.execute(
-        """
-        SELECT
-            p.*,
-            u.name AS university_name
-        FROM university_programs p
-        INNER JOIN universities u
-            ON p.university_id = u.id
-        WHERE p.id = ?
-        """,
-        (program_id,),
-    ).fetchone()
-
-    connection.close()
-
-    return {
-        "success": True,
-        "message": "University program added successfully.",
-        "program": dict(program),
-    }
+    finally:
+        connection.close()
 
 
-# ==========================================
-# Get All Programs
-# ==========================================
+# ============================================================
+# GET ALL PROGRAMS
+# GET /universities/programs
+# ============================================================
 
-@router.get("/")
+@router.get("/programs")
 async def get_programs():
+
     connection = get_connection()
     cursor = connection.cursor()
 
-    programs = cursor.execute(
-        """
-        SELECT
-            p.*,
-            u.name AS university_name
-        FROM university_programs p
-        INNER JOIN universities u
-            ON p.university_id = u.id
-        ORDER BY
-            u.name ASC,
-            p.program_name ASC
-        """
-    ).fetchall()
+    try:
 
-    connection.close()
+        programs = cursor.execute(
+            """
+            SELECT
+                p.*,
+                u.name AS university_name
+            FROM university_programs p
+            INNER JOIN universities u
+                ON p.university_id = u.id
+            ORDER BY
+                u.name ASC,
+                p.program_name ASC
+            """
+        ).fetchall()
 
-    return {
-        "success": True,
-        "count": len(programs),
-        "programs": [
-            dict(program)
-            for program in programs
-        ],
-    }
+        return {
+            "success": True,
+            "count": len(programs),
+            "programs": [
+                dict(program)
+                for program in programs
+            ],
+        }
+
+    finally:
+        connection.close()
 
 
-# ==========================================
-# Get Programs By University
-# ==========================================
+# ============================================================
+# GET PROGRAMS BY UNIVERSITY
+# GET /universities/{university_id}/programs
+# ============================================================
 
-@router.get("/university/{university_id}")
+@router.get("/{university_id}/programs")
 async def get_university_programs(
     university_id: int,
 ):
+
     connection = get_connection()
     cursor = connection.cursor()
 
-    # --------------------------------------
-    # Check University
-    # --------------------------------------
+    try:
 
-    university = cursor.execute(
-        """
-        SELECT id, name
-        FROM universities
-        WHERE id = ?
-        """,
-        (university_id,),
-    ).fetchone()
+        # ----------------------------------------------------
+        # Check University
+        # ----------------------------------------------------
 
-    if not university:
+        university = cursor.execute(
+            """
+            SELECT id, name
+            FROM universities
+            WHERE id = ?
+            """,
+            (university_id,),
+        ).fetchone()
+
+        if not university:
+            raise HTTPException(
+                status_code=404,
+                detail="University not found.",
+            )
+
+        # ----------------------------------------------------
+        # Get Programs
+        # ----------------------------------------------------
+
+        programs = cursor.execute(
+            """
+            SELECT *
+            FROM university_programs
+            WHERE university_id = ?
+            ORDER BY program_name ASC
+            """,
+            (university_id,),
+        ).fetchall()
+
+        return {
+            "success": True,
+            "count": len(programs),
+            "programs": [
+                dict(program)
+                for program in programs
+            ],
+        }
+
+    finally:
         connection.close()
 
-        raise HTTPException(
-            status_code=404,
-            detail="University not found.",
-        )
 
-    # --------------------------------------
-    # Get Programs
-    # --------------------------------------
+# ============================================================
+# GET SINGLE PROGRAM
+# GET /universities/programs/{program_id}
+# ============================================================
 
-    programs = cursor.execute(
-        """
-        SELECT *
-        FROM university_programs
-        WHERE university_id = ?
-        ORDER BY program_name ASC
-        """,
-        (university_id,),
-    ).fetchall()
-
-    connection.close()
-
-    return {
-        "success": True,
-        "university": dict(university),
-        "count": len(programs),
-        "programs": [
-            dict(program)
-            for program in programs
-        ],
-    }
-
-
-# ==========================================
-# Get Single Program
-# ==========================================
-
-@router.get("/{program_id}")
+@router.get("/programs/{program_id}")
 async def get_program(
     program_id: int,
 ):
+
     connection = get_connection()
     cursor = connection.cursor()
 
-    program = cursor.execute(
-        """
-        SELECT
-            p.*,
-            u.name AS university_name
-        FROM university_programs p
-        INNER JOIN universities u
-            ON p.university_id = u.id
-        WHERE p.id = ?
-        """,
-        (program_id,),
-    ).fetchone()
+    try:
 
-    connection.close()
+        program = cursor.execute(
+            """
+            SELECT
+                p.*,
+                u.name AS university_name
+            FROM university_programs p
+            INNER JOIN universities u
+                ON p.university_id = u.id
+            WHERE p.id = ?
+            """,
+            (program_id,),
+        ).fetchone()
 
-    if not program:
-        raise HTTPException(
-            status_code=404,
-            detail="University program not found.",
-        )
+        if not program:
+            raise HTTPException(
+                status_code=404,
+                detail="University program not found.",
+            )
 
-    return {
-        "success": True,
-        "program": dict(program),
-    }
+        return {
+            "success": True,
+            "program": dict(program),
+        }
+
+    finally:
+        connection.close()
 
 
-# ==========================================
-# Update University Program
-# ==========================================
+# ============================================================
+# UPDATE UNIVERSITY PROGRAM
+# PUT /universities/programs/{program_id}
+# ============================================================
 
-@router.put("/{program_id}")
+@router.put("/programs/{program_id}")
 async def update_program(
     program_id: int,
     request: ProgramUpdateRequest,
 ):
+
     connection = get_connection()
     cursor = connection.cursor()
 
-    # --------------------------------------
-    # Get Existing Program
-    # --------------------------------------
+    try:
 
-    existing = cursor.execute(
-        """
-        SELECT *
-        FROM university_programs
-        WHERE id = ?
-        """,
-        (program_id,),
-    ).fetchone()
+        # ----------------------------------------------------
+        # Get Existing Program
+        # ----------------------------------------------------
 
-    if not existing:
-        connection.close()
+        existing = cursor.execute(
+            """
+            SELECT *
+            FROM university_programs
+            WHERE id = ?
+            """,
+            (program_id,),
+        ).fetchone()
 
-        raise HTTPException(
-            status_code=404,
-            detail="University program not found.",
+        if not existing:
+            raise HTTPException(
+                status_code=404,
+                detail="University program not found.",
+            )
+
+        # ----------------------------------------------------
+        # Prepare Updated Values
+        # ----------------------------------------------------
+
+        program_name = (
+            request.program_name.strip()
+            if request.program_name is not None
+            else existing["program_name"]
         )
 
-    # --------------------------------------
-    # Prepare Updated Values
-    # --------------------------------------
+        if not program_name:
+            raise HTTPException(
+                status_code=400,
+                detail="Program name cannot be empty.",
+            )
 
-    program_name = (
-        request.program_name.strip()
-        if request.program_name is not None
-        else existing["program_name"]
-    )
-
-    if not program_name:
-        connection.close()
-
-        raise HTTPException(
-            status_code=400,
-            detail="Program name cannot be empty.",
+        degree_level = (
+            request.degree_level
+            if request.degree_level is not None
+            else existing["degree_level"]
         )
 
-    degree_level = (
-        request.degree_level
-        if request.degree_level is not None
-        else existing["degree_level"]
-    )
+        department = (
+            request.department
+            if request.department is not None
+            else existing["department"]
+        )
 
-    department = (
-        request.department
-        if request.department is not None
-        else existing["department"]
-    )
+        campus = (
+            request.campus
+            if request.campus is not None
+            else existing["campus"]
+        )
 
-    campus = (
-        request.campus
-        if request.campus is not None
-        else existing["campus"]
-    )
+        duration = (
+            request.duration
+            if request.duration is not None
+            else existing["duration"]
+        )
 
-    duration = (
-        request.duration
-        if request.duration is not None
-        else existing["duration"]
-    )
+        study_mode = (
+            request.study_mode
+            if request.study_mode is not None
+            else existing["study_mode"]
+        )
 
-    study_mode = (
-        request.study_mode
-        if request.study_mode is not None
-        else existing["study_mode"]
-    )
+        eligibility = (
+            request.eligibility
+            if request.eligibility is not None
+            else existing["eligibility"]
+        )
 
-    eligibility = (
-        request.eligibility
-        if request.eligibility is not None
-        else existing["eligibility"]
-    )
+        entry_test_required = (
+            int(request.entry_test_required)
+            if request.entry_test_required is not None
+            else existing["entry_test_required"]
+        )
 
-    entry_test_required = (
-        int(request.entry_test_required)
-        if request.entry_test_required is not None
-        else existing["entry_test_required"]
-    )
+        admission_status = (
+            request.admission_status
+            if request.admission_status is not None
+            else existing["admission_status"]
+        )
 
-    admission_status = (
-        request.admission_status
-        if request.admission_status is not None
-        else existing["admission_status"]
-    )
+        academic_session = (
+            request.academic_session
+            if request.academic_session is not None
+            else existing["academic_session"]
+        )
 
-    academic_session = (
-        request.academic_session
-        if request.academic_session is not None
-        else existing["academic_session"]
-    )
+        source_url = (
+            request.source_url
+            if request.source_url is not None
+            else existing["source_url"]
+        )
 
-    source_url = (
-        request.source_url
-        if request.source_url is not None
-        else existing["source_url"]
-    )
+        last_verified = (
+            request.last_verified
+            if request.last_verified is not None
+            else existing["last_verified"]
+        )
 
-    # --------------------------------------
-    # Check Duplicate Program
-    # --------------------------------------
+        # ----------------------------------------------------
+        # Check Duplicate Program
+        # ----------------------------------------------------
 
-    duplicate = cursor.execute(
-        """
-        SELECT id
-        FROM university_programs
-        WHERE university_id = ?
-        AND LOWER(program_name) = LOWER(?)
-        AND id != ?
-        """,
-        (
-            existing["university_id"],
-            program_name,
-            program_id,
-        ),
-    ).fetchone()
+        duplicate = cursor.execute(
+            """
+            SELECT id
+            FROM university_programs
+            WHERE university_id = ?
+            AND LOWER(program_name) = LOWER(?)
+            AND id != ?
+            """,
+            (
+                existing["university_id"],
+                program_name,
+                program_id,
+            ),
+        ).fetchone()
 
-    if duplicate:
-        connection.close()
+        if duplicate:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Another program with this name "
+                    "already exists for this university."
+                ),
+            )
 
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "Another program with this name "
-                "already exists for this university."
+        # ----------------------------------------------------
+        # Update Program
+        # ----------------------------------------------------
+
+        cursor.execute(
+            """
+            UPDATE university_programs
+            SET
+                program_name = ?,
+                degree_level = ?,
+                department = ?,
+                campus = ?,
+                duration = ?,
+                study_mode = ?,
+                eligibility = ?,
+                entry_test_required = ?,
+                admission_status = ?,
+                academic_session = ?,
+                source_url = ?,
+                last_verified = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (
+                program_name,
+                degree_level,
+                department,
+                campus,
+                duration,
+                study_mode,
+                eligibility,
+                entry_test_required,
+                admission_status,
+                academic_session,
+                source_url,
+                last_verified,
+                program_id,
             ),
         )
 
-    # --------------------------------------
-    # Update Program
-    # --------------------------------------
+        connection.commit()
 
-    cursor.execute(
-        """
-        UPDATE university_programs
-        SET
-            program_name = ?,
-            degree_level = ?,
-            department = ?,
-            campus = ?,
-            duration = ?,
-            study_mode = ?,
-            eligibility = ?,
-            entry_test_required = ?,
-            admission_status = ?,
-            academic_session = ?,
-            source_url = ?,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-        """,
-        (
-            program_name,
-            degree_level,
-            department,
-            campus,
-            duration,
-            study_mode,
-            eligibility,
-            entry_test_required,
-            admission_status,
-            academic_session,
-            source_url,
-            program_id,
-        ),
-    )
+        # ----------------------------------------------------
+        # Get Updated Program
+        # ----------------------------------------------------
 
-    connection.commit()
+        updated_program = cursor.execute(
+            """
+            SELECT
+                p.*,
+                u.name AS university_name
+            FROM university_programs p
+            INNER JOIN universities u
+                ON p.university_id = u.id
+            WHERE p.id = ?
+            """,
+            (program_id,),
+        ).fetchone()
 
-    # --------------------------------------
-    # Get Updated Program
-    # --------------------------------------
+        return {
+            "success": True,
+            "message": "University program updated successfully.",
+            "program": dict(updated_program),
+        }
 
-    updated_program = cursor.execute(
-        """
-        SELECT
-            p.*,
-            u.name AS university_name
-        FROM university_programs p
-        INNER JOIN universities u
-            ON p.university_id = u.id
-        WHERE p.id = ?
-        """,
-        (program_id,),
-    ).fetchone()
-
-    connection.close()
-
-    return {
-        "success": True,
-        "message": "University program updated successfully.",
-        "program": dict(updated_program),
-    }
+    finally:
+        connection.close()
 
 
-# ==========================================
-# Delete University Program
-# ==========================================
+# ============================================================
+# DELETE UNIVERSITY PROGRAM
+# DELETE /universities/programs/{program_id}
+# ============================================================
 
-@router.delete("/{program_id}")
+@router.delete("/programs/{program_id}")
 async def delete_program(
     program_id: int,
 ):
+
     connection = get_connection()
     cursor = connection.cursor()
 
-    existing = cursor.execute(
-        """
-        SELECT id, program_name
-        FROM university_programs
-        WHERE id = ?
-        """,
-        (program_id,),
-    ).fetchone()
+    try:
 
-    if not existing:
-        connection.close()
+        # ----------------------------------------------------
+        # Check Existing Program
+        # ----------------------------------------------------
 
-        raise HTTPException(
-            status_code=404,
-            detail="University program not found.",
+        existing = cursor.execute(
+            """
+            SELECT id, program_name
+            FROM university_programs
+            WHERE id = ?
+            """,
+            (program_id,),
+        ).fetchone()
+
+        if not existing:
+            raise HTTPException(
+                status_code=404,
+                detail="University program not found.",
+            )
+
+        # ----------------------------------------------------
+        # Delete Program
+        # ----------------------------------------------------
+
+        cursor.execute(
+            """
+            DELETE FROM university_programs
+            WHERE id = ?
+            """,
+            (program_id,),
         )
 
-    cursor.execute(
-        """
-        DELETE FROM university_programs
-        WHERE id = ?
-        """,
-        (program_id,),
-    )
+        connection.commit()
 
-    connection.commit()
+        return {
+            "success": True,
+            "message": "University program deleted successfully.",
+            "program_id": program_id,
+            "program_name": existing["program_name"],
+        }
 
-    connection.close()
-
-    return {
-        "success": True,
-        "message": "University program deleted successfully.",
-        "program_id": program_id,
-        "program_name": existing["program_name"],
-    }
+    finally:
+        connection.close()
