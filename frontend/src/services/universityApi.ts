@@ -615,7 +615,7 @@ export async function getUniversityPrograms(
   universityId: number
 ): Promise<ProgramListResponse> {
   return apiRequest<ProgramListResponse>(
-    `/universities/${universityId}/programs`
+    `/university-programs/university/${universityId}`
   );
 }
 
@@ -630,7 +630,7 @@ export async function createProgram(
   message: string;
   program: UniversityProgram;
 }> {
-  return apiRequest("/universities/programs", {
+  return apiRequest("/university-programs/", {
     method: "POST",
     body: JSON.stringify(data),
   });
@@ -648,7 +648,7 @@ export async function updateProgram(
   message: string;
   program: UniversityProgram;
 }> {
-  return apiRequest(`/universities/programs/${programId}`, {
+  return apiRequest(`/university-programs/${programId}`, {
     method: "PUT",
     body: JSON.stringify(data),
   });
@@ -661,7 +661,7 @@ export async function updateProgram(
 export async function deleteProgram(
   programId: number
 ): Promise<ApiSuccessResponse> {
-  return apiRequest(`/universities/programs/${programId}`, {
+  return apiRequest(`/university-programs/${programId}`, {
     method: "DELETE",
   });
 }
