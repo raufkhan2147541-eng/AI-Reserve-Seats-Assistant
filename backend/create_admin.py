@@ -1,6 +1,6 @@
 import bcrypt
 
-from backend.database import get_connection
+from database import get_connection
 
 
 # ==========================================

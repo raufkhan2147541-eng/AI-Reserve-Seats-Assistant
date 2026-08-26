@@ -4,12 +4,12 @@ import bcrypt
 import secrets
 from datetime import datetime, timedelta
 
-from backend.auth_utils import (
+from auth_utils import (
     create_access_token,
     create_admin_access_token,
     get_current_student,
 )
-from backend.database import get_connection
+from database import get_connection
 
 
 router = APIRouter(

@@ -4,11 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 import bcrypt
 
-from backend.auth_utils import (
+from auth_utils import (
     create_admin_access_token,
     get_current_admin,
 )
-from backend.database import get_connection
+from database import get_connection
 
 
 router = APIRouter(

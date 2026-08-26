@@ -1,18 +1,18 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.create_admin import create_admin
-from backend.database import initialize_database
+from create_admin import create_admin
+from database import initialize_database
 
-from backend.routers.auth import router as auth_router
-from backend.routers.knowledge import router as knowledge_router
-from backend.routers.qa import router as qa_router
-from backend.routers.universities import router as universities_router
-from backend.routers.university_programs import (
+from routers.auth import router as auth_router
+from routers.knowledge import router as knowledge_router
+from routers.qa import router as qa_router
+from routers.universities import router as universities_router
+from routers.university_programs import (
     router as university_programs_router
 )
 
-from backend.admin import router as admin_router
+from admin import router as admin_router
 
 
 # ==========================================
