@@ -3,13 +3,13 @@ import sqlite3
 from config import DATABASE_URL
 
 
-# ==========================================
-# Get Database Path
-# ==========================================
+# ============================================================
+# DATABASE PATH
+# ============================================================
 
 def get_database_path() -> str:
     """
-    Convert the SQLite database URL into a local file path.
+    Convert SQLite database URL into a local database file path.
     """
 
     prefix = "sqlite:///"
@@ -20,9 +20,9 @@ def get_database_path() -> str:
     return DATABASE_URL
 
 
-# ==========================================
-# Get Database Connection
-# ==========================================
+# ============================================================
+# DATABASE CONNECTION
+# ============================================================
 
 def get_connection():
     """
@@ -34,6 +34,7 @@ def get_connection():
         check_same_thread=False,
     )
 
+    # Return rows like dictionaries
     connection.row_factory = sqlite3.Row
 
     # Enable foreign key support
@@ -42,9 +43,9 @@ def get_connection():
     return connection
 
 
-# ==========================================
-# Initialize Database
-# ==========================================
+# ============================================================
+# INITIALIZE DATABASE
+# ============================================================
 
 def initialize_database():
     """
@@ -54,380 +55,431 @@ def initialize_database():
     connection = get_connection()
     cursor = connection.cursor()
 
-    # ======================================
-    # Students Table
-    # ======================================
+    try:
 
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS students (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            full_name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        # ====================================================
+        # STUDENTS TABLE
+        # ====================================================
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS students (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                full_name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
         )
-        """
-    )
 
-    # ======================================
-    # Admins Table
-    # ======================================
+        # ====================================================
+        # ADMINS TABLE
+        # ====================================================
 
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS admins (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            full_name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS admins (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                full_name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
         )
-        """
-    )
 
-    # ======================================
-    # Knowledge Documents Table
-    # ======================================
+        # ====================================================
+        # KNOWLEDGE DOCUMENTS TABLE
+        # ====================================================
 
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS knowledge_documents (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            file_name TEXT,
-            file_type TEXT,
-            content TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS knowledge_documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                file_name TEXT,
+                file_type TEXT,
+                content TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
         )
-        """
-    )
 
-    # ======================================
-    # Chat History Table
-    # ======================================
+        # ====================================================
+        # CHAT HISTORY TABLE
+        # ====================================================
 
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS chat_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_id INTEGER,
-            question TEXT NOT NULL,
-            answer TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (student_id)
-            REFERENCES students(id)
-            ON DELETE CASCADE
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chat_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id INTEGER,
+                question TEXT NOT NULL,
+                answer TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+                FOREIGN KEY (student_id)
+                REFERENCES students(id)
+                ON DELETE CASCADE
+            )
+            """
         )
-        """
-    )
 
-    # ======================================
-    # Password Reset Tokens Table
-    # ======================================
+        # ====================================================
+        # PASSWORD RESET TOKENS TABLE
+        # ====================================================
 
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS password_reset_tokens (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_id INTEGER NOT NULL,
-            token TEXT UNIQUE NOT NULL,
-            expires_at TIMESTAMP NOT NULL,
-            used INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (student_id)
-            REFERENCES students(id)
-            ON DELETE CASCADE
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                student_id INTEGER NOT NULL,
+
+                token TEXT UNIQUE NOT NULL,
+
+                expires_at TIMESTAMP NOT NULL,
+
+                used INTEGER DEFAULT 0,
+
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+                FOREIGN KEY (student_id)
+                REFERENCES students(id)
+                ON DELETE CASCADE
+            )
+            """
         )
-        """
-    )
 
-    # ======================================
-    # Universities Table
-    # ======================================
+        # ====================================================
+        # UNIVERSITIES TABLE
+        # ====================================================
 
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS universities (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS universities (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-            name TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL UNIQUE,
 
-            university_type TEXT,
+                university_type TEXT,
 
-            province TEXT,
+                province TEXT,
 
-            city TEXT,
+                city TEXT,
 
-            campus TEXT,
+                campus TEXT,
 
-            official_website TEXT,
+                official_website TEXT,
 
-            admission_portal TEXT,
+                admission_portal TEXT,
 
-            hec_recognized INTEGER DEFAULT 0,
+                hec_recognized INTEGER DEFAULT 0,
 
-            hec_recognition_source TEXT,
+                hec_recognition_source TEXT,
 
-            description TEXT,
+                description TEXT,
 
-            last_verified TIMESTAMP,
+                last_verified TIMESTAMP,
 
-            academic_session TEXT,
+                academic_session TEXT,
 
-            is_active INTEGER DEFAULT 1,
+                is_active INTEGER DEFAULT 1,
 
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
         )
-        """
-    )
 
-    # ======================================
-    # University Programs Table
-    # ======================================
+        # ====================================================
+        # UNIVERSITY PROGRAMS TABLE
+        # ====================================================
 
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS university_programs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS university_programs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-            university_id INTEGER NOT NULL,
+                university_id INTEGER NOT NULL,
 
-            program_name TEXT NOT NULL,
+                program_name TEXT NOT NULL,
 
-            degree_level TEXT,
+                degree_level TEXT,
 
-            department TEXT,
+                department TEXT,
 
-            campus TEXT,
+                campus TEXT,
 
-            duration TEXT,
+                duration TEXT,
 
-            study_mode TEXT,
+                study_mode TEXT,
 
-            eligibility TEXT,
+                eligibility TEXT,
 
-            entry_test_required INTEGER DEFAULT 0,
+                entry_test_required INTEGER DEFAULT 0,
 
-            admission_status TEXT,
+                admission_status TEXT,
 
-            academic_session TEXT,
+                academic_session TEXT,
 
-            source_url TEXT,
+                source_url TEXT,
 
-            last_verified TIMESTAMP,
+                last_verified TIMESTAMP,
 
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-            FOREIGN KEY (university_id)
-            REFERENCES universities(id)
-            ON DELETE CASCADE
+                FOREIGN KEY (university_id)
+                REFERENCES universities(id)
+                ON DELETE CASCADE
+            )
+            """
         )
-        """
-    )
 
-    # ======================================
-    # University Fee Structures Table
-    # ======================================
+        # ====================================================
+        # UNIVERSITY FEE STRUCTURES TABLE
+        # ====================================================
 
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS university_fee_structures (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS university_fee_structures (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-            university_id INTEGER NOT NULL,
+                university_id INTEGER NOT NULL,
 
-            program_id INTEGER,
+                program_id INTEGER,
 
-            program_name TEXT,
+                program_name TEXT,
 
-            admission_fee REAL,
+                admission_fee REAL,
 
-            tuition_fee REAL,
+                tuition_fee REAL,
 
-            semester_fee REAL,
+                semester_fee REAL,
 
-            examination_fee REAL,
+                examination_fee REAL,
 
-            hostel_fee REAL,
+                hostel_fee REAL,
 
-            transport_fee REAL,
+                transport_fee REAL,
 
-            other_fee REAL,
+                other_fee REAL,
 
-            total_fee REAL,
+                total_fee REAL,
 
-            fee_frequency TEXT,
+                fee_frequency TEXT,
 
-            academic_session TEXT,
+                academic_session TEXT,
 
-            currency TEXT DEFAULT 'PKR',
+                currency TEXT DEFAULT 'PKR',
 
-            source_url TEXT,
+                source_url TEXT,
 
-            last_verified TIMESTAMP,
+                last_verified TIMESTAMP,
 
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-            FOREIGN KEY (university_id)
-            REFERENCES universities(id)
-            ON DELETE CASCADE,
+                FOREIGN KEY (university_id)
+                REFERENCES universities(id)
+                ON DELETE CASCADE,
 
-            FOREIGN KEY (program_id)
-            REFERENCES university_programs(id)
-            ON DELETE SET NULL
+                FOREIGN KEY (program_id)
+                REFERENCES university_programs(id)
+                ON DELETE SET NULL
+            )
+            """
         )
-        """
-    )
 
-    # ======================================
-    # Admission Deadlines Table
-    # ======================================
+        # ====================================================
+        # ADMISSION DEADLINES TABLE
+        # ====================================================
 
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS admission_deadlines (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS admission_deadlines (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-            university_id INTEGER NOT NULL,
+                university_id INTEGER NOT NULL,
 
-            program_id INTEGER,
+                program_id INTEGER,
 
-            admission_title TEXT,
+                admission_title TEXT,
 
-            admission_session TEXT,
+                admission_session TEXT,
 
-            application_open_date TEXT,
+                application_open_date TEXT,
 
-            application_deadline TEXT,
+                application_deadline TEXT,
 
-            entry_test_date TEXT,
+                entry_test_date TEXT,
 
-            interview_date TEXT,
+                interview_date TEXT,
 
-            merit_list_date TEXT,
+                merit_list_date TEXT,
 
-            fee_submission_deadline TEXT,
+                fee_submission_deadline TEXT,
 
-            admission_status TEXT,
+                admission_status TEXT,
 
-            source_url TEXT,
+                source_url TEXT,
 
-            last_verified TIMESTAMP,
+                last_verified TIMESTAMP,
 
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-            FOREIGN KEY (university_id)
-            REFERENCES universities(id)
-            ON DELETE CASCADE,
+                FOREIGN KEY (university_id)
+                REFERENCES universities(id)
+                ON DELETE CASCADE,
 
-            FOREIGN KEY (program_id)
-            REFERENCES university_programs(id)
-            ON DELETE SET NULL
+                FOREIGN KEY (program_id)
+                REFERENCES university_programs(id)
+                ON DELETE SET NULL
+            )
+            """
         )
-        """
-    )
 
-    # ======================================
-    # Admission Requirements Table
-    # ======================================
+        # ====================================================
+        # ADMISSION REQUIREMENTS TABLE
+        # ====================================================
 
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS admission_requirements (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS admission_requirements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-            university_id INTEGER NOT NULL,
+                university_id INTEGER NOT NULL,
 
-            program_id INTEGER,
+                program_id INTEGER,
 
-            requirement_type TEXT,
+                requirement_type TEXT,
 
-            requirement_title TEXT,
+                requirement_title TEXT,
 
-            requirement_description TEXT,
+                requirement_description TEXT,
 
-            minimum_percentage REAL,
+                minimum_percentage REAL,
 
-            required_subjects TEXT,
+                required_subjects TEXT,
 
-            required_documents TEXT,
+                required_documents TEXT,
 
-            domicile_required INTEGER DEFAULT 0,
+                domicile_required INTEGER DEFAULT 0,
 
-            entry_test_required INTEGER DEFAULT 0,
+                entry_test_required INTEGER DEFAULT 0,
 
-            source_url TEXT,
+                source_url TEXT,
 
-            last_verified TIMESTAMP,
+                last_verified TIMESTAMP,
 
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-            FOREIGN KEY (university_id)
-            REFERENCES universities(id)
-            ON DELETE CASCADE,
+                FOREIGN KEY (university_id)
+                REFERENCES universities(id)
+                ON DELETE CASCADE,
 
-            FOREIGN KEY (program_id)
-            REFERENCES university_programs(id)
-            ON DELETE SET NULL
+                FOREIGN KEY (program_id)
+                REFERENCES university_programs(id)
+                ON DELETE SET NULL
+            )
+            """
         )
-        """
-    )
 
-    # ======================================
-    # University Sources Table
-    # ======================================
+        # ====================================================
+        # UNIVERSITY SOURCES TABLE
+        # ====================================================
 
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS university_sources (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS university_sources (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-            university_id INTEGER NOT NULL,
+                university_id INTEGER NOT NULL,
 
-            source_title TEXT NOT NULL,
+                source_title TEXT NOT NULL,
 
-            source_url TEXT NOT NULL,
+                source_url TEXT NOT NULL,
 
-            source_type TEXT,
+                source_type TEXT,
 
-            academic_session TEXT,
+                academic_session TEXT,
 
-            verification_status TEXT DEFAULT 'pending',
+                verification_status TEXT DEFAULT 'pending',
 
-            last_checked TIMESTAMP,
+                last_checked TIMESTAMP,
 
-            notes TEXT,
+                notes TEXT,
 
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-            FOREIGN KEY (university_id)
-            REFERENCES universities(id)
-            ON DELETE CASCADE
+                FOREIGN KEY (university_id)
+                REFERENCES universities(id)
+                ON DELETE CASCADE
+            )
+            """
         )
-        """
-    )
 
-    # ======================================
-    # Save Changes
-    # ======================================
+        # ====================================================
+        # INDEXES
+        # ====================================================
 
-    connection.commit()
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_university_programs_university
+            ON university_programs(university_id)
+            """
+        )
 
-    # ======================================
-    # Close Connection
-    # ======================================
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_fee_structures_university
+            ON university_fee_structures(university_id)
+            """
+        )
 
-    connection.close()
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_admission_deadlines_university
+            ON admission_deadlines(university_id)
+            """
+        )
+
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_admission_requirements_university
+            ON admission_requirements(university_id)
+            """
+        )
+
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_university_sources_university
+            ON university_sources(university_id)
+            """
+        )
+
+        # ====================================================
+        # COMMIT
+        # ====================================================
+
+        connection.commit()
+
+        print("Database initialized successfully.")
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
