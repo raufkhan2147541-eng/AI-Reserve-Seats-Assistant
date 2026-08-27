@@ -1,3 +1,5 @@
+// universityApi.tsx
+
 const API_BASE_URL = "https://ai-reserve-seats-assistant.onrender.com";
 
 // ============================================================
@@ -20,6 +22,8 @@ export interface University {
   hec_recognition_source?: string | null;
 
   description?: string | null;
+
+  last_verified?: string | null;
   academic_session?: string | null;
 
   is_active?: boolean | number;
@@ -27,6 +31,10 @@ export interface University {
   created_at?: string;
   updated_at?: string;
 }
+
+// ============================================================
+// PROGRAM
+// ============================================================
 
 export interface UniversityProgram {
   id: number;
@@ -55,6 +63,10 @@ export interface UniversityProgram {
   updated_at?: string;
 }
 
+// ============================================================
+// FEE
+// ============================================================
+
 export interface UniversityFee {
   id: number;
   university_id: number;
@@ -74,7 +86,6 @@ export interface UniversityFee {
 
   fee_frequency?: string | null;
   academic_session?: string | null;
-
   currency?: string | null;
 
   source_url?: string | null;
@@ -83,6 +94,10 @@ export interface UniversityFee {
   created_at?: string;
   updated_at?: string;
 }
+
+// ============================================================
+// ADMISSION DEADLINE
+// ============================================================
 
 export interface AdmissionDeadline {
   id: number;
@@ -111,6 +126,10 @@ export interface AdmissionDeadline {
   updated_at?: string;
 }
 
+// ============================================================
+// ADMISSION REQUIREMENT
+// ============================================================
+
 export interface AdmissionRequirement {
   id: number;
   university_id: number;
@@ -136,6 +155,10 @@ export interface AdmissionRequirement {
   updated_at?: string;
 }
 
+// ============================================================
+// UNIVERSITY SOURCE
+// ============================================================
+
 export interface UniversitySource {
   id: number;
   university_id: number;
@@ -157,7 +180,7 @@ export interface UniversitySource {
 }
 
 // ============================================================
-// CREATE REQUEST TYPES
+// UNIVERSITY CREATE REQUEST
 // ============================================================
 
 export interface UniversityCreateRequest {
@@ -175,8 +198,16 @@ export interface UniversityCreateRequest {
   hec_recognition_source?: string | null;
 
   description?: string | null;
+
+  last_verified?: string | null;
   academic_session?: string | null;
+
+  is_active?: boolean;
 }
+
+// ============================================================
+// PROGRAM CREATE REQUEST
+// ============================================================
 
 export interface ProgramCreateRequest {
   university_id: number;
@@ -201,6 +232,10 @@ export interface ProgramCreateRequest {
   last_verified?: string | null;
 }
 
+// ============================================================
+// FEE CREATE REQUEST
+// ============================================================
+
 export interface FeeCreateRequest {
   university_id: number;
 
@@ -219,12 +254,15 @@ export interface FeeCreateRequest {
 
   fee_frequency?: string | null;
   academic_session?: string | null;
-
-  currency?: string;
+  currency?: string | null;
 
   source_url?: string | null;
   last_verified?: string | null;
 }
+
+// ============================================================
+// DEADLINE CREATE REQUEST
+// ============================================================
 
 export interface DeadlineCreateRequest {
   university_id: number;
@@ -249,6 +287,10 @@ export interface DeadlineCreateRequest {
   last_verified?: string | null;
 }
 
+// ============================================================
+// REQUIREMENT CREATE REQUEST
+// ============================================================
+
 export interface RequirementCreateRequest {
   university_id: number;
 
@@ -270,6 +312,10 @@ export interface RequirementCreateRequest {
   last_verified?: string | null;
 }
 
+// ============================================================
+// SOURCE CREATE REQUEST
+// ============================================================
+
 export interface SourceCreateRequest {
   university_id: number;
 
@@ -286,7 +332,7 @@ export interface SourceCreateRequest {
 }
 
 // ============================================================
-// UPDATE REQUEST TYPES
+// UNIVERSITY UPDATE REQUEST
 // ============================================================
 
 export interface UniversityUpdateRequest {
@@ -304,10 +350,16 @@ export interface UniversityUpdateRequest {
   hec_recognition_source?: string | null;
 
   description?: string | null;
+
+  last_verified?: string | null;
   academic_session?: string | null;
 
   is_active?: boolean | null;
 }
+
+// ============================================================
+// PROGRAM UPDATE REQUEST
+// ============================================================
 
 export interface ProgramUpdateRequest {
   program_name?: string | null;
@@ -330,6 +382,10 @@ export interface ProgramUpdateRequest {
   last_verified?: string | null;
 }
 
+// ============================================================
+// FEE UPDATE REQUEST
+// ============================================================
+
 export interface FeeUpdateRequest {
   program_id?: number | null;
   program_name?: string | null;
@@ -346,12 +402,15 @@ export interface FeeUpdateRequest {
 
   fee_frequency?: string | null;
   academic_session?: string | null;
-
   currency?: string | null;
 
   source_url?: string | null;
   last_verified?: string | null;
 }
+
+// ============================================================
+// DEADLINE UPDATE REQUEST
+// ============================================================
 
 export interface DeadlineUpdateRequest {
   program_id?: number | null;
@@ -374,6 +433,10 @@ export interface DeadlineUpdateRequest {
   last_verified?: string | null;
 }
 
+// ============================================================
+// REQUIREMENT UPDATE REQUEST
+// ============================================================
+
 export interface RequirementUpdateRequest {
   program_id?: number | null;
 
@@ -393,6 +456,10 @@ export interface RequirementUpdateRequest {
   last_verified?: string | null;
 }
 
+// ============================================================
+// SOURCE UPDATE REQUEST
+// ============================================================
+
 export interface SourceUpdateRequest {
   source_title?: string | null;
   source_url?: string | null;
@@ -407,7 +474,16 @@ export interface SourceUpdateRequest {
 }
 
 // ============================================================
-// RESPONSE TYPES
+// COMMON RESPONSE
+// ============================================================
+
+export interface ApiSuccessResponse {
+  success: boolean;
+  message?: string;
+}
+
+// ============================================================
+// LIST RESPONSES
 // ============================================================
 
 export interface UniversityListResponse {
@@ -446,6 +522,10 @@ export interface SourceListResponse {
   sources: UniversitySource[];
 }
 
+// ============================================================
+// UNIVERSITY DETAILS
+// ============================================================
+
 export interface UniversityDetailsResponse {
   success: boolean;
 
@@ -456,15 +536,6 @@ export interface UniversityDetailsResponse {
   deadlines: AdmissionDeadline[];
   requirements: AdmissionRequirement[];
   sources: UniversitySource[];
-}
-
-// ============================================================
-// GENERIC API RESPONSE
-// ============================================================
-
-interface ApiSuccessResponse {
-  success: boolean;
-  message?: string;
 }
 
 // ============================================================
@@ -496,6 +567,7 @@ async function apiRequest<T>(
     const message =
       data?.detail ||
       data?.message ||
+      data?.error ||
       `Request failed with status ${response.status}`;
 
     throw new Error(message);
@@ -505,12 +577,16 @@ async function apiRequest<T>(
 }
 
 // ============================================================
-// UNIVERSITIES - GET
+// UNIVERSITIES
 // ============================================================
+
+// GET ALL UNIVERSITIES
 
 export async function getUniversities(): Promise<UniversityListResponse> {
   return apiRequest<UniversityListResponse>("/universities/");
 }
+
+// SEARCH UNIVERSITIES
 
 export async function searchUniversities(params?: {
   query?: string;
@@ -520,20 +596,23 @@ export async function searchUniversities(params?: {
 }): Promise<UniversityListResponse> {
   const searchParams = new URLSearchParams();
 
-  if (params?.query) {
-    searchParams.append("query", params.query);
+  if (params?.query?.trim()) {
+    searchParams.append("query", params.query.trim());
   }
 
-  if (params?.province) {
-    searchParams.append("province", params.province);
+  if (params?.province?.trim()) {
+    searchParams.append("province", params.province.trim());
   }
 
-  if (params?.city) {
-    searchParams.append("city", params.city);
+  if (params?.city?.trim()) {
+    searchParams.append("city", params.city.trim());
   }
 
-  if (params?.university_type) {
-    searchParams.append("university_type", params.university_type);
+  if (params?.university_type?.trim()) {
+    searchParams.append(
+      "university_type",
+      params.university_type.trim()
+    );
   }
 
   const queryString = searchParams.toString();
@@ -543,14 +622,21 @@ export async function searchUniversities(params?: {
   );
 }
 
+// GET SINGLE UNIVERSITY
+
 export async function getUniversity(
   universityId: number
 ): Promise<{
   success: boolean;
   university: University;
 }> {
-  return apiRequest(`/universities/${universityId}`);
+  return apiRequest<{
+    success: boolean;
+    university: University;
+  }>(`/universities/${universityId}`);
 }
+
+// GET UNIVERSITY COMPLETE DETAILS
 
 export async function getUniversityDetails(
   universityId: number
@@ -560,9 +646,7 @@ export async function getUniversityDetails(
   );
 }
 
-// ============================================================
-// UNIVERSITIES - CREATE
-// ============================================================
+// CREATE UNIVERSITY
 
 export async function createUniversity(
   data: UniversityCreateRequest
@@ -571,15 +655,17 @@ export async function createUniversity(
   message: string;
   university: University;
 }> {
-  return apiRequest("/universities/", {
+  return apiRequest<{
+    success: boolean;
+    message: string;
+    university: University;
+  }>("/universities/", {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
-// ============================================================
-// UNIVERSITIES - UPDATE
-// ============================================================
+// UPDATE UNIVERSITY
 
 export async function updateUniversity(
   universityId: number,
@@ -589,27 +675,39 @@ export async function updateUniversity(
   message: string;
   university: University;
 }> {
-  return apiRequest(`/universities/${universityId}`, {
+  return apiRequest<{
+    success: boolean;
+    message: string;
+    university: University;
+  }>(`/universities/${universityId}`, {
     method: "PUT",
     body: JSON.stringify(data),
   });
 }
 
-// ============================================================
-// UNIVERSITIES - DELETE
-// ============================================================
+// DELETE UNIVERSITY
 
 export async function deleteUniversity(
   universityId: number
-): Promise<ApiSuccessResponse & { university_id: number }> {
-  return apiRequest(`/universities/${universityId}`, {
+): Promise<
+  ApiSuccessResponse & {
+    university_id?: number;
+  }
+> {
+  return apiRequest<
+    ApiSuccessResponse & {
+      university_id?: number;
+    }
+  >(`/universities/${universityId}`, {
     method: "DELETE",
   });
 }
 
 // ============================================================
-// PROGRAMS - GET
+// PROGRAMS
 // ============================================================
+
+// GET PROGRAMS
 
 export async function getUniversityPrograms(
   universityId: number
@@ -619,9 +717,7 @@ export async function getUniversityPrograms(
   );
 }
 
-// ============================================================
-// PROGRAMS - CREATE
-// ============================================================
+// CREATE PROGRAM
 
 export async function createProgram(
   data: ProgramCreateRequest
@@ -630,15 +726,17 @@ export async function createProgram(
   message: string;
   program: UniversityProgram;
 }> {
-  return apiRequest("/universities/programs", {
+  return apiRequest<{
+    success: boolean;
+    message: string;
+    program: UniversityProgram;
+  }>("/universities/programs", {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
-// ============================================================
-// PROGRAMS - UPDATE
-// ============================================================
+// UPDATE PROGRAM
 
 export async function updateProgram(
   programId: number,
@@ -648,27 +746,34 @@ export async function updateProgram(
   message: string;
   program: UniversityProgram;
 }> {
-  return apiRequest(`/universities/programs/${programId}`, {
+  return apiRequest<{
+    success: boolean;
+    message: string;
+    program: UniversityProgram;
+  }>(`/universities/programs/${programId}`, {
     method: "PUT",
     body: JSON.stringify(data),
   });
 }
 
-// ============================================================
-// PROGRAMS - DELETE
-// ============================================================
+// DELETE PROGRAM
 
 export async function deleteProgram(
   programId: number
 ): Promise<ApiSuccessResponse> {
-  return apiRequest(`/universities/programs/${programId}`, {
-    method: "DELETE",
-  });
+  return apiRequest<ApiSuccessResponse>(
+    `/universities/programs/${programId}`,
+    {
+      method: "DELETE",
+    }
+  );
 }
 
 // ============================================================
-// FEES - GET
+// FEES
 // ============================================================
+
+// GET FEES
 
 export async function getUniversityFees(
   universityId: number
@@ -678,9 +783,7 @@ export async function getUniversityFees(
   );
 }
 
-// ============================================================
-// FEES - CREATE
-// ============================================================
+// CREATE FEE
 
 export async function createFee(
   data: FeeCreateRequest
@@ -689,15 +792,17 @@ export async function createFee(
   message: string;
   fee: UniversityFee;
 }> {
-  return apiRequest("/universities/fees", {
+  return apiRequest<{
+    success: boolean;
+    message: string;
+    fee: UniversityFee;
+  }>("/universities/fees", {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
-// ============================================================
-// FEES - UPDATE
-// ============================================================
+// UPDATE FEE
 
 export async function updateFee(
   feeId: number,
@@ -707,27 +812,34 @@ export async function updateFee(
   message: string;
   fee: UniversityFee;
 }> {
-  return apiRequest(`/universities/fees/${feeId}`, {
+  return apiRequest<{
+    success: boolean;
+    message: string;
+    fee: UniversityFee;
+  }>(`/universities/fees/${feeId}`, {
     method: "PUT",
     body: JSON.stringify(data),
   });
 }
 
-// ============================================================
-// FEES - DELETE
-// ============================================================
+// DELETE FEE
 
 export async function deleteFee(
   feeId: number
 ): Promise<ApiSuccessResponse> {
-  return apiRequest(`/universities/fees/${feeId}`, {
-    method: "DELETE",
-  });
+  return apiRequest<ApiSuccessResponse>(
+    `/universities/fees/${feeId}`,
+    {
+      method: "DELETE",
+    }
+  );
 }
 
 // ============================================================
-// ADMISSION DEADLINES - GET
+// ADMISSION DEADLINES
 // ============================================================
+
+// GET DEADLINES
 
 export async function getUniversityDeadlines(
   universityId: number
@@ -737,9 +849,7 @@ export async function getUniversityDeadlines(
   );
 }
 
-// ============================================================
-// ADMISSION DEADLINES - CREATE
-// ============================================================
+// CREATE DEADLINE
 
 export async function createDeadline(
   data: DeadlineCreateRequest
@@ -748,15 +858,17 @@ export async function createDeadline(
   message: string;
   deadline: AdmissionDeadline;
 }> {
-  return apiRequest("/universities/deadlines", {
+  return apiRequest<{
+    success: boolean;
+    message: string;
+    deadline: AdmissionDeadline;
+  }>("/universities/deadlines", {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
-// ============================================================
-// ADMISSION DEADLINES - UPDATE
-// ============================================================
+// UPDATE DEADLINE
 
 export async function updateDeadline(
   deadlineId: number,
@@ -766,27 +878,34 @@ export async function updateDeadline(
   message: string;
   deadline: AdmissionDeadline;
 }> {
-  return apiRequest(`/universities/deadlines/${deadlineId}`, {
+  return apiRequest<{
+    success: boolean;
+    message: string;
+    deadline: AdmissionDeadline;
+  }>(`/universities/deadlines/${deadlineId}`, {
     method: "PUT",
     body: JSON.stringify(data),
   });
 }
 
-// ============================================================
-// ADMISSION DEADLINES - DELETE
-// ============================================================
+// DELETE DEADLINE
 
 export async function deleteDeadline(
   deadlineId: number
 ): Promise<ApiSuccessResponse> {
-  return apiRequest(`/universities/deadlines/${deadlineId}`, {
-    method: "DELETE",
-  });
+  return apiRequest<ApiSuccessResponse>(
+    `/universities/deadlines/${deadlineId}`,
+    {
+      method: "DELETE",
+    }
+  );
 }
 
 // ============================================================
-// ADMISSION REQUIREMENTS - GET
+// ADMISSION REQUIREMENTS
 // ============================================================
+
+// GET REQUIREMENTS
 
 export async function getUniversityRequirements(
   universityId: number
@@ -796,9 +915,7 @@ export async function getUniversityRequirements(
   );
 }
 
-// ============================================================
-// ADMISSION REQUIREMENTS - CREATE
-// ============================================================
+// CREATE REQUIREMENT
 
 export async function createRequirement(
   data: RequirementCreateRequest
@@ -807,15 +924,17 @@ export async function createRequirement(
   message: string;
   requirement: AdmissionRequirement;
 }> {
-  return apiRequest("/universities/requirements", {
+  return apiRequest<{
+    success: boolean;
+    message: string;
+    requirement: AdmissionRequirement;
+  }>("/universities/requirements", {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
-// ============================================================
-// ADMISSION REQUIREMENTS - UPDATE
-// ============================================================
+// UPDATE REQUIREMENT
 
 export async function updateRequirement(
   requirementId: number,
@@ -825,27 +944,34 @@ export async function updateRequirement(
   message: string;
   requirement: AdmissionRequirement;
 }> {
-  return apiRequest(`/universities/requirements/${requirementId}`, {
+  return apiRequest<{
+    success: boolean;
+    message: string;
+    requirement: AdmissionRequirement;
+  }>(`/universities/requirements/${requirementId}`, {
     method: "PUT",
     body: JSON.stringify(data),
   });
 }
 
-// ============================================================
-// ADMISSION REQUIREMENTS - DELETE
-// ============================================================
+// DELETE REQUIREMENT
 
 export async function deleteRequirement(
   requirementId: number
 ): Promise<ApiSuccessResponse> {
-  return apiRequest(`/universities/requirements/${requirementId}`, {
-    method: "DELETE",
-  });
+  return apiRequest<ApiSuccessResponse>(
+    `/universities/requirements/${requirementId}`,
+    {
+      method: "DELETE",
+    }
+  );
 }
 
 // ============================================================
-// UNIVERSITY SOURCES - GET
+// UNIVERSITY SOURCES
 // ============================================================
+
+// GET SOURCES
 
 export async function getUniversitySources(
   universityId: number
@@ -855,9 +981,7 @@ export async function getUniversitySources(
   );
 }
 
-// ============================================================
-// UNIVERSITY SOURCES - CREATE
-// ============================================================
+// CREATE SOURCE
 
 export async function createSource(
   data: SourceCreateRequest
@@ -866,15 +990,17 @@ export async function createSource(
   message: string;
   source: UniversitySource;
 }> {
-  return apiRequest("/universities/sources", {
+  return apiRequest<{
+    success: boolean;
+    message: string;
+    source: UniversitySource;
+  }>("/universities/sources", {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
-// ============================================================
-// UNIVERSITY SOURCES - UPDATE
-// ============================================================
+// UPDATE SOURCE
 
 export async function updateSource(
   sourceId: number,
@@ -884,22 +1010,27 @@ export async function updateSource(
   message: string;
   source: UniversitySource;
 }> {
-  return apiRequest(`/universities/sources/${sourceId}`, {
+  return apiRequest<{
+    success: boolean;
+    message: string;
+    source: UniversitySource;
+  }>(`/universities/sources/${sourceId}`, {
     method: "PUT",
     body: JSON.stringify(data),
   });
 }
 
-// ============================================================
-// UNIVERSITY SOURCES - DELETE
-// ============================================================
+// DELETE SOURCE
 
 export async function deleteSource(
   sourceId: number
 ): Promise<ApiSuccessResponse> {
-  return apiRequest("/universities/sources/" + sourceId, {
-    method: "DELETE",
-  });
+  return apiRequest<ApiSuccessResponse>(
+    `/universities/sources/${sourceId}`,
+    {
+      method: "DELETE",
+    }
+  );
 }
 
 // ============================================================
