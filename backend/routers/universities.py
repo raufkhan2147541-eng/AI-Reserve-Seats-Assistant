@@ -1,9 +1,14 @@
+from typing import Optional, Any
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import Optional
 
 from database import get_connection
 
+
+# ============================================================
+# ROUTER
+# ============================================================
 
 router = APIRouter(
     prefix="/universities",
@@ -12,11 +17,100 @@ router = APIRouter(
 
 
 # ============================================================
-# UNIVERSITY MODELS
+# HELPER FUNCTIONS
+# ============================================================
+
+def row_to_dict(row):
+    """
+    Convert sqlite3.Row into normal dictionary.
+    """
+    return dict(row) if row else None
+
+
+def rows_to_list(rows):
+    """
+    Convert sqlite3.Row list into dictionaries.
+    """
+    return [dict(row) for row in rows]
+
+
+def normalize_optional_string(value):
+    """
+    Convert empty strings to None.
+    """
+    if value is None:
+        return None
+
+    value = str(value).strip()
+
+    return value if value else None
+
+
+def university_exists(cursor, university_id: int):
+    """
+    Check whether university exists.
+    """
+    row = cursor.execute(
+        """
+        SELECT id
+        FROM universities
+        WHERE id = ?
+        """,
+        (university_id,),
+    ).fetchone()
+
+    return row is not None
+
+
+def program_exists(cursor, program_id: int):
+    """
+    Check whether program exists.
+    """
+    row = cursor.execute(
+        """
+        SELECT id
+        FROM university_programs
+        WHERE id = ?
+        """,
+        (program_id,),
+    ).fetchone()
+
+    return row is not None
+
+
+def validate_university(cursor, university_id: int):
+    """
+    Raise 404 if university does not exist.
+    """
+    if not university_exists(cursor, university_id):
+        raise HTTPException(
+            status_code=404,
+            detail="University not found.",
+        )
+
+
+def validate_program(cursor, program_id: int):
+    """
+    Raise 404 if program does not exist.
+    """
+    if not program_exists(cursor, program_id):
+        raise HTTPException(
+            status_code=404,
+            detail="Program not found.",
+        )
+
+
+# ============================================================
+# PYDANTIC SCHEMAS
+# ============================================================
+
+
+# ============================================================
+# UNIVERSITY SCHEMAS
 # ============================================================
 
 class UniversityCreateRequest(BaseModel):
-    name: str = Field(..., min_length=2)
+    name: str = Field(..., min_length=1)
 
     university_type: Optional[str] = None
     province: Optional[str] = None
@@ -30,7 +124,10 @@ class UniversityCreateRequest(BaseModel):
     hec_recognition_source: Optional[str] = None
 
     description: Optional[str] = None
+    last_verified: Optional[str] = None
     academic_session: Optional[str] = None
+
+    is_active: bool = True
 
 
 class UniversityUpdateRequest(BaseModel):
@@ -48,18 +145,20 @@ class UniversityUpdateRequest(BaseModel):
     hec_recognition_source: Optional[str] = None
 
     description: Optional[str] = None
+    last_verified: Optional[str] = None
     academic_session: Optional[str] = None
+
     is_active: Optional[bool] = None
 
 
 # ============================================================
-# PROGRAM MODELS
+# PROGRAM SCHEMAS
 # ============================================================
 
 class ProgramCreateRequest(BaseModel):
     university_id: int
 
-    program_name: str = Field(..., min_length=2)
+    program_name: str = Field(..., min_length=1)
 
     degree_level: Optional[str] = None
     department: Optional[str] = None
@@ -88,6 +187,7 @@ class ProgramUpdateRequest(BaseModel):
 
     duration: Optional[str] = None
     study_mode: Optional[str] = None
+
     eligibility: Optional[str] = None
 
     entry_test_required: Optional[bool] = None
@@ -100,7 +200,7 @@ class ProgramUpdateRequest(BaseModel):
 
 
 # ============================================================
-# FEE MODELS
+# FEE SCHEMAS
 # ============================================================
 
 class FeeCreateRequest(BaseModel):
@@ -116,13 +216,12 @@ class FeeCreateRequest(BaseModel):
     hostel_fee: Optional[float] = None
     transport_fee: Optional[float] = None
     other_fee: Optional[float] = None
-
     total_fee: Optional[float] = None
 
     fee_frequency: Optional[str] = None
     academic_session: Optional[str] = None
 
-    currency: str = "PKR"
+    currency: Optional[str] = "PKR"
 
     source_url: Optional[str] = None
     last_verified: Optional[str] = None
@@ -139,7 +238,6 @@ class FeeUpdateRequest(BaseModel):
     hostel_fee: Optional[float] = None
     transport_fee: Optional[float] = None
     other_fee: Optional[float] = None
-
     total_fee: Optional[float] = None
 
     fee_frequency: Optional[str] = None
@@ -152,7 +250,7 @@ class FeeUpdateRequest(BaseModel):
 
 
 # ============================================================
-# DEADLINE MODELS
+# DEADLINE SCHEMAS
 # ============================================================
 
 class DeadlineCreateRequest(BaseModel):
@@ -199,7 +297,7 @@ class DeadlineUpdateRequest(BaseModel):
 
 
 # ============================================================
-# REQUIREMENT MODELS
+# REQUIREMENT SCHEMAS
 # ============================================================
 
 class RequirementCreateRequest(BaseModel):
@@ -211,7 +309,6 @@ class RequirementCreateRequest(BaseModel):
     requirement_description: Optional[str] = None
 
     minimum_percentage: Optional[float] = None
-
     required_subjects: Optional[str] = None
     required_documents: Optional[str] = None
 
@@ -230,7 +327,6 @@ class RequirementUpdateRequest(BaseModel):
     requirement_description: Optional[str] = None
 
     minimum_percentage: Optional[float] = None
-
     required_subjects: Optional[str] = None
     required_documents: Optional[str] = None
 
@@ -242,14 +338,14 @@ class RequirementUpdateRequest(BaseModel):
 
 
 # ============================================================
-# SOURCE MODELS
+# SOURCE SCHEMAS
 # ============================================================
 
 class SourceCreateRequest(BaseModel):
     university_id: int
 
-    source_title: str = Field(..., min_length=2)
-    source_url: str = Field(..., min_length=5)
+    source_title: str = Field(..., min_length=1)
+    source_url: str = Field(..., min_length=1)
 
     source_type: Optional[str] = None
     academic_session: Optional[str] = None
@@ -274,96 +370,6 @@ class SourceUpdateRequest(BaseModel):
 
 
 # ============================================================
-# CREATE UNIVERSITY
-# ============================================================
-
-@router.post("/")
-async def create_university(
-    request: UniversityCreateRequest,
-):
-    name = request.name.strip()
-
-    if not name:
-        raise HTTPException(
-            status_code=400,
-            detail="University name is required.",
-        )
-
-    connection = get_connection()
-    cursor = connection.cursor()
-
-    try:
-        existing = cursor.execute(
-            """
-            SELECT id
-            FROM universities
-            WHERE LOWER(name) = LOWER(?)
-            """,
-            (name,),
-        ).fetchone()
-
-        if existing:
-            raise HTTPException(
-                status_code=409,
-                detail="This university already exists.",
-            )
-
-        cursor.execute(
-            """
-            INSERT INTO universities (
-                name,
-                university_type,
-                province,
-                city,
-                campus,
-                official_website,
-                admission_portal,
-                hec_recognized,
-                hec_recognition_source,
-                description,
-                academic_session
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                name,
-                request.university_type,
-                request.province,
-                request.city,
-                request.campus,
-                request.official_website,
-                request.admission_portal,
-                int(request.hec_recognized),
-                request.hec_recognition_source,
-                request.description,
-                request.academic_session,
-            ),
-        )
-
-        connection.commit()
-
-        university_id = cursor.lastrowid
-
-        university = cursor.execute(
-            """
-            SELECT *
-            FROM universities
-            WHERE id = ?
-            """,
-            (university_id,),
-        ).fetchone()
-
-        return {
-            "success": True,
-            "message": "University added successfully.",
-            "university": dict(university),
-        }
-
-    finally:
-        connection.close()
-
-
-# ============================================================
 # SEARCH UNIVERSITIES
 # ============================================================
 
@@ -374,12 +380,12 @@ async def search_universities(
     city: Optional[str] = None,
     university_type: Optional[str] = None,
 ):
-    query = query.strip()
-
     connection = get_connection()
     cursor = connection.cursor()
 
     try:
+        query = query.strip()
+
         sql = """
             SELECT *
             FROM universities
@@ -394,6 +400,7 @@ async def search_universities(
                     LOWER(name) LIKE LOWER(?)
                     OR LOWER(city) LIKE LOWER(?)
                     OR LOWER(province) LIKE LOWER(?)
+                    OR LOWER(university_type) LIKE LOWER(?)
                 )
             """
 
@@ -404,6 +411,7 @@ async def search_universities(
                     search_value,
                     search_value,
                     search_value,
+                    search_value,
                 ]
             )
 
@@ -411,18 +419,21 @@ async def search_universities(
             sql += """
                 AND LOWER(province) = LOWER(?)
             """
+
             parameters.append(province.strip())
 
         if city:
             sql += """
                 AND LOWER(city) = LOWER(?)
             """
+
             parameters.append(city.strip())
 
         if university_type:
             sql += """
                 AND LOWER(university_type) = LOWER(?)
             """
+
             parameters.append(university_type.strip())
 
         sql += """
@@ -437,10 +448,7 @@ async def search_universities(
         return {
             "success": True,
             "count": len(universities),
-            "universities": [
-                dict(university)
-                for university in universities
-            ],
+            "universities": rows_to_list(universities),
         }
 
     finally:
@@ -469,10 +477,7 @@ async def get_universities():
         return {
             "success": True,
             "count": len(universities),
-            "universities": [
-                dict(university)
-                for university in universities
-            ],
+            "universities": rows_to_list(universities),
         }
 
     finally:
@@ -480,7 +485,139 @@ async def get_universities():
 
 
 # ============================================================
-# GET COMPLETE UNIVERSITY PROFILE
+# CREATE UNIVERSITY
+# ============================================================
+
+@router.post("/")
+async def create_university(
+    request: UniversityCreateRequest,
+):
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    try:
+        name = request.name.strip()
+
+        if not name:
+            raise HTTPException(
+                status_code=400,
+                detail="University name cannot be empty.",
+            )
+
+        existing = cursor.execute(
+            """
+            SELECT id
+            FROM universities
+            WHERE LOWER(name) = LOWER(?)
+            """,
+            (name,),
+        ).fetchone()
+
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail="A university with this name already exists.",
+            )
+
+        cursor.execute(
+            """
+            INSERT INTO universities (
+                name,
+                university_type,
+                province,
+                city,
+                campus,
+                official_website,
+                admission_portal,
+                hec_recognized,
+                hec_recognition_source,
+                description,
+                last_verified,
+                academic_session,
+                is_active
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                name,
+                normalize_optional_string(
+                    request.university_type
+                ),
+                normalize_optional_string(
+                    request.province
+                ),
+                normalize_optional_string(
+                    request.city
+                ),
+                normalize_optional_string(
+                    request.campus
+                ),
+                normalize_optional_string(
+                    request.official_website
+                ),
+                normalize_optional_string(
+                    request.admission_portal
+                ),
+                int(request.hec_recognized),
+                normalize_optional_string(
+                    request.hec_recognition_source
+                ),
+                normalize_optional_string(
+                    request.description
+                ),
+                normalize_optional_string(
+                    request.last_verified
+                ),
+                normalize_optional_string(
+                    request.academic_session
+                ),
+                int(request.is_active),
+            ),
+        )
+
+        university_id = cursor.lastrowid
+
+        connection.commit()
+
+        university = cursor.execute(
+            """
+            SELECT *
+            FROM universities
+            WHERE id = ?
+            """,
+            (university_id,),
+        ).fetchone()
+
+        return {
+            "success": True,
+            "message": "University created successfully.",
+            "university": row_to_dict(university),
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to create university: {str(error)}",
+        )
+
+    finally:
+        connection.close()
+
+
+# ============================================================
+# GET COMPLETE UNIVERSITY DETAILS
+#
+# University
+#   ├── Programs
+#   ├── Fees
+#   ├── Deadlines
+#   ├── Requirements
+#   └── Sources
 # ============================================================
 
 @router.get("/{university_id}/details")
@@ -558,12 +695,30 @@ async def get_university_details(
 
         return {
             "success": True,
-            "university": dict(university),
-            "programs": [dict(item) for item in programs],
-            "fees": [dict(item) for item in fees],
-            "deadlines": [dict(item) for item in deadlines],
-            "requirements": [dict(item) for item in requirements],
-            "sources": [dict(item) for item in sources],
+
+            "university": row_to_dict(
+                university
+            ),
+
+            "programs": rows_to_list(
+                programs
+            ),
+
+            "fees": rows_to_list(
+                fees
+            ),
+
+            "deadlines": rows_to_list(
+                deadlines
+            ),
+
+            "requirements": rows_to_list(
+                requirements
+            ),
+
+            "sources": rows_to_list(
+                sources
+            ),
         }
 
     finally:
@@ -599,7 +754,7 @@ async def get_university(
 
         return {
             "success": True,
-            "university": dict(university),
+            "university": row_to_dict(university),
         }
 
     finally:
@@ -679,6 +834,7 @@ async def update_university(
                 hec_recognized = ?,
                 hec_recognition_source = ?,
                 description = ?,
+                last_verified = ?,
                 academic_session = ?,
                 is_active = ?,
                 updated_at = CURRENT_TIMESTAMP
@@ -686,39 +842,55 @@ async def update_university(
             """,
             (
                 name,
+
                 request.university_type
                 if request.university_type is not None
                 else existing["university_type"],
+
                 request.province
                 if request.province is not None
                 else existing["province"],
+
                 request.city
                 if request.city is not None
                 else existing["city"],
+
                 request.campus
                 if request.campus is not None
                 else existing["campus"],
+
                 request.official_website
                 if request.official_website is not None
                 else existing["official_website"],
+
                 request.admission_portal
                 if request.admission_portal is not None
                 else existing["admission_portal"],
+
                 int(request.hec_recognized)
                 if request.hec_recognized is not None
                 else existing["hec_recognized"],
+
                 request.hec_recognition_source
                 if request.hec_recognition_source is not None
                 else existing["hec_recognition_source"],
+
                 request.description
                 if request.description is not None
                 else existing["description"],
+
+                request.last_verified
+                if request.last_verified is not None
+                else existing["last_verified"],
+
                 request.academic_session
                 if request.academic_session is not None
                 else existing["academic_session"],
+
                 int(request.is_active)
                 if request.is_active is not None
                 else existing["is_active"],
+
                 university_id,
             ),
         )
@@ -737,8 +909,19 @@ async def update_university(
         return {
             "success": True,
             "message": "University updated successfully.",
-            "university": dict(updated),
+            "university": row_to_dict(updated),
         }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to update university: {str(error)}",
+        )
 
     finally:
         connection.close()
@@ -758,7 +941,7 @@ async def delete_university(
     try:
         existing = cursor.execute(
             """
-            SELECT id, name
+            SELECT *
             FROM universities
             WHERE id = ?
             """,
@@ -784,7 +967,61 @@ async def delete_university(
         return {
             "success": True,
             "message": "University deleted successfully.",
-            "university_id": university_id,
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to delete university: {str(error)}",
+        )
+
+    finally:
+        connection.close()
+
+
+# ============================================================
+# ============================================================
+# PROGRAMS
+# ============================================================
+# ============================================================
+
+
+# ============================================================
+# GET PROGRAMS FOR UNIVERSITY
+# ============================================================
+
+@router.get("/{university_id}/programs")
+async def get_university_programs(
+    university_id: int,
+):
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    try:
+        validate_university(
+            cursor,
+            university_id,
+        )
+
+        programs = cursor.execute(
+            """
+            SELECT *
+            FROM university_programs
+            WHERE university_id = ?
+            ORDER BY program_name ASC
+            """,
+            (university_id,),
+        ).fetchall()
+
+        return {
+            "success": True,
+            "count": len(programs),
+            "programs": rows_to_list(programs),
         }
 
     finally:
@@ -793,6 +1030,8 @@ async def delete_university(
 
 # ============================================================
 # CREATE PROGRAM
+#
+# POST /universities/programs
 # ============================================================
 
 @router.post("/programs")
@@ -803,27 +1042,17 @@ async def create_program(
     cursor = connection.cursor()
 
     try:
-        university = cursor.execute(
-            """
-            SELECT id
-            FROM universities
-            WHERE id = ?
-            """,
-            (request.university_id,),
-        ).fetchone()
-
-        if not university:
-            raise HTTPException(
-                status_code=404,
-                detail="University not found.",
-            )
+        validate_university(
+            cursor,
+            request.university_id,
+        )
 
         program_name = request.program_name.strip()
 
         if not program_name:
             raise HTTPException(
                 status_code=400,
-                detail="Program name is required.",
+                detail="Program name cannot be empty.",
             )
 
         cursor.execute(
@@ -848,23 +1077,43 @@ async def create_program(
             (
                 request.university_id,
                 program_name,
-                request.degree_level,
-                request.department,
-                request.campus,
-                request.duration,
-                request.study_mode,
-                request.eligibility,
+                normalize_optional_string(
+                    request.degree_level
+                ),
+                normalize_optional_string(
+                    request.department
+                ),
+                normalize_optional_string(
+                    request.campus
+                ),
+                normalize_optional_string(
+                    request.duration
+                ),
+                normalize_optional_string(
+                    request.study_mode
+                ),
+                normalize_optional_string(
+                    request.eligibility
+                ),
                 int(request.entry_test_required),
-                request.admission_status,
-                request.academic_session,
-                request.source_url,
-                request.last_verified,
+                normalize_optional_string(
+                    request.admission_status
+                ),
+                normalize_optional_string(
+                    request.academic_session
+                ),
+                normalize_optional_string(
+                    request.source_url
+                ),
+                normalize_optional_string(
+                    request.last_verified
+                ),
             ),
         )
 
-        connection.commit()
-
         program_id = cursor.lastrowid
+
+        connection.commit()
 
         program = cursor.execute(
             """
@@ -877,59 +1126,20 @@ async def create_program(
 
         return {
             "success": True,
-            "message": "University program added successfully.",
-            "program": dict(program),
+            "message": "Program created successfully.",
+            "program": row_to_dict(program),
         }
 
-    finally:
-        connection.close()
+    except HTTPException:
+        raise
 
+    except Exception as error:
+        connection.rollback()
 
-# ============================================================
-# GET UNIVERSITY PROGRAMS
-# ============================================================
-
-@router.get("/{university_id}/programs")
-async def get_university_programs(
-    university_id: int,
-):
-    connection = get_connection()
-    cursor = connection.cursor()
-
-    try:
-        university = cursor.execute(
-            """
-            SELECT id
-            FROM universities
-            WHERE id = ?
-            """,
-            (university_id,),
-        ).fetchone()
-
-        if not university:
-            raise HTTPException(
-                status_code=404,
-                detail="University not found.",
-            )
-
-        programs = cursor.execute(
-            """
-            SELECT *
-            FROM university_programs
-            WHERE university_id = ?
-            ORDER BY program_name ASC
-            """,
-            (university_id,),
-        ).fetchall()
-
-        return {
-            "success": True,
-            "count": len(programs),
-            "programs": [
-                dict(program)
-                for program in programs
-            ],
-        }
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to create program: {str(error)}",
+        )
 
     finally:
         connection.close()
@@ -996,46 +1206,58 @@ async def update_program(
             """,
             (
                 program_name,
+
                 request.degree_level
                 if request.degree_level is not None
                 else existing["degree_level"],
+
                 request.department
                 if request.department is not None
                 else existing["department"],
+
                 request.campus
                 if request.campus is not None
                 else existing["campus"],
+
                 request.duration
                 if request.duration is not None
                 else existing["duration"],
+
                 request.study_mode
                 if request.study_mode is not None
                 else existing["study_mode"],
+
                 request.eligibility
                 if request.eligibility is not None
                 else existing["eligibility"],
+
                 int(request.entry_test_required)
                 if request.entry_test_required is not None
                 else existing["entry_test_required"],
+
                 request.admission_status
                 if request.admission_status is not None
                 else existing["admission_status"],
+
                 request.academic_session
                 if request.academic_session is not None
                 else existing["academic_session"],
+
                 request.source_url
                 if request.source_url is not None
                 else existing["source_url"],
+
                 request.last_verified
                 if request.last_verified is not None
                 else existing["last_verified"],
+
                 program_id,
             ),
         )
 
         connection.commit()
 
-        updated = cursor.execute(
+        program = cursor.execute(
             """
             SELECT *
             FROM university_programs
@@ -1047,8 +1269,19 @@ async def update_program(
         return {
             "success": True,
             "message": "Program updated successfully.",
-            "program": dict(updated),
+            "program": row_to_dict(program),
         }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to update program: {str(error)}",
+        )
 
     finally:
         connection.close()
@@ -1096,12 +1329,67 @@ async def delete_program(
             "message": "Program deleted successfully.",
         }
 
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to delete program: {str(error)}",
+        )
+
     finally:
         connection.close()
 
 
 # ============================================================
-# CREATE FEE STRUCTURE
+# ============================================================
+# FEES
+# ============================================================
+# ============================================================
+
+
+# ============================================================
+# GET FEES
+# ============================================================
+
+@router.get("/{university_id}/fees")
+async def get_university_fees(
+    university_id: int,
+):
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    try:
+        validate_university(
+            cursor,
+            university_id,
+        )
+
+        fees = cursor.execute(
+            """
+            SELECT *
+            FROM university_fee_structures
+            WHERE university_id = ?
+            ORDER BY program_name ASC
+            """,
+            (university_id,),
+        ).fetchall()
+
+        return {
+            "success": True,
+            "count": len(fees),
+            "fees": rows_to_list(fees),
+        }
+
+    finally:
+        connection.close()
+
+
+# ============================================================
+# CREATE FEE
 # ============================================================
 
 @router.post("/fees")
@@ -1112,39 +1400,30 @@ async def create_fee(
     cursor = connection.cursor()
 
     try:
-        university = cursor.execute(
-            """
-            SELECT id
-            FROM universities
-            WHERE id = ?
-            """,
-            (request.university_id,),
-        ).fetchone()
-
-        if not university:
-            raise HTTPException(
-                status_code=404,
-                detail="University not found.",
-            )
+        validate_university(
+            cursor,
+            request.university_id,
+        )
 
         if request.program_id is not None:
+            validate_program(
+                cursor,
+                request.program_id,
+            )
+
             program = cursor.execute(
                 """
-                SELECT id
+                SELECT university_id
                 FROM university_programs
                 WHERE id = ?
-                AND university_id = ?
                 """,
-                (
-                    request.program_id,
-                    request.university_id,
-                ),
+                (request.program_id,),
             ).fetchone()
 
-            if not program:
+            if program["university_id"] != request.university_id:
                 raise HTTPException(
-                    status_code=404,
-                    detail="Program not found for this university.",
+                    status_code=400,
+                    detail="Program does not belong to this university.",
                 )
 
         cursor.execute(
@@ -1172,7 +1451,9 @@ async def create_fee(
             (
                 request.university_id,
                 request.program_id,
-                request.program_name,
+                normalize_optional_string(
+                    request.program_name
+                ),
                 request.admission_fee,
                 request.tuition_fee,
                 request.semester_fee,
@@ -1181,17 +1462,27 @@ async def create_fee(
                 request.transport_fee,
                 request.other_fee,
                 request.total_fee,
-                request.fee_frequency,
-                request.academic_session,
-                request.currency,
-                request.source_url,
-                request.last_verified,
+                normalize_optional_string(
+                    request.fee_frequency
+                ),
+                normalize_optional_string(
+                    request.academic_session
+                ),
+                normalize_optional_string(
+                    request.currency
+                ) or "PKR",
+                normalize_optional_string(
+                    request.source_url
+                ),
+                normalize_optional_string(
+                    request.last_verified
+                ),
             ),
         )
 
-        connection.commit()
-
         fee_id = cursor.lastrowid
+
+        connection.commit()
 
         fee = cursor.execute(
             """
@@ -1204,66 +1495,27 @@ async def create_fee(
 
         return {
             "success": True,
-            "message": "Fee structure added successfully.",
-            "fee": dict(fee),
+            "message": "Fee structure created successfully.",
+            "fee": row_to_dict(fee),
         }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to create fee structure: {str(error)}",
+        )
 
     finally:
         connection.close()
 
 
 # ============================================================
-# GET UNIVERSITY FEES
-# ============================================================
-
-@router.get("/{university_id}/fees")
-async def get_university_fees(
-    university_id: int,
-):
-    connection = get_connection()
-    cursor = connection.cursor()
-
-    try:
-        university = cursor.execute(
-            """
-            SELECT id
-            FROM universities
-            WHERE id = ?
-            """,
-            (university_id,),
-        ).fetchone()
-
-        if not university:
-            raise HTTPException(
-                status_code=404,
-                detail="University not found.",
-            )
-
-        fees = cursor.execute(
-            """
-            SELECT *
-            FROM university_fee_structures
-            WHERE university_id = ?
-            ORDER BY program_name ASC
-            """,
-            (university_id,),
-        ).fetchall()
-
-        return {
-            "success": True,
-            "count": len(fees),
-            "fees": [
-                dict(fee)
-                for fee in fees
-            ],
-        }
-
-    finally:
-        connection.close()
-
-
-# ============================================================
-# UPDATE FEE STRUCTURE
+# UPDATE FEE
 # ============================================================
 
 @router.put("/fees/{fee_id}")
@@ -1290,30 +1542,25 @@ async def update_fee(
                 detail="Fee structure not found.",
             )
 
-        program_id = (
-            request.program_id
-            if request.program_id is not None
-            else existing["program_id"]
-        )
+        if request.program_id is not None:
+            validate_program(
+                cursor,
+                request.program_id,
+            )
 
-        if program_id is not None:
             program = cursor.execute(
                 """
-                SELECT id
+                SELECT university_id
                 FROM university_programs
                 WHERE id = ?
-                AND university_id = ?
                 """,
-                (
-                    program_id,
-                    existing["university_id"],
-                ),
+                (request.program_id,),
             ).fetchone()
 
-            if not program:
+            if program["university_id"] != existing["university_id"]:
                 raise HTTPException(
-                    status_code=404,
-                    detail="Program not found for this university.",
+                    status_code=400,
+                    detail="Program does not belong to this university.",
                 )
 
         cursor.execute(
@@ -1339,56 +1586,73 @@ async def update_fee(
             WHERE id = ?
             """,
             (
-                program_id,
+                request.program_id
+                if request.program_id is not None
+                else existing["program_id"],
+
                 request.program_name
                 if request.program_name is not None
                 else existing["program_name"],
+
                 request.admission_fee
                 if request.admission_fee is not None
                 else existing["admission_fee"],
+
                 request.tuition_fee
                 if request.tuition_fee is not None
                 else existing["tuition_fee"],
+
                 request.semester_fee
                 if request.semester_fee is not None
                 else existing["semester_fee"],
+
                 request.examination_fee
                 if request.examination_fee is not None
                 else existing["examination_fee"],
+
                 request.hostel_fee
                 if request.hostel_fee is not None
                 else existing["hostel_fee"],
+
                 request.transport_fee
                 if request.transport_fee is not None
                 else existing["transport_fee"],
+
                 request.other_fee
                 if request.other_fee is not None
                 else existing["other_fee"],
+
                 request.total_fee
                 if request.total_fee is not None
                 else existing["total_fee"],
+
                 request.fee_frequency
                 if request.fee_frequency is not None
                 else existing["fee_frequency"],
+
                 request.academic_session
                 if request.academic_session is not None
                 else existing["academic_session"],
+
                 request.currency
                 if request.currency is not None
                 else existing["currency"],
+
                 request.source_url
                 if request.source_url is not None
                 else existing["source_url"],
+
                 request.last_verified
                 if request.last_verified is not None
                 else existing["last_verified"],
+
                 fee_id,
             ),
         )
 
         connection.commit()
 
-        updated = cursor.execute(
+        fee = cursor.execute(
             """
             SELECT *
             FROM university_fee_structures
@@ -1400,15 +1664,26 @@ async def update_fee(
         return {
             "success": True,
             "message": "Fee structure updated successfully.",
-            "fee": dict(updated),
+            "fee": row_to_dict(fee),
         }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to update fee structure: {str(error)}",
+        )
 
     finally:
         connection.close()
 
 
 # ============================================================
-# DELETE FEE STRUCTURE
+# DELETE FEE
 # ============================================================
 
 @router.delete("/fees/{fee_id}")
@@ -1449,12 +1724,67 @@ async def delete_fee(
             "message": "Fee structure deleted successfully.",
         }
 
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to delete fee structure: {str(error)}",
+        )
+
     finally:
         connection.close()
 
 
 # ============================================================
-# CREATE ADMISSION DEADLINE
+# ============================================================
+# DEADLINES
+# ============================================================
+# ============================================================
+
+
+# ============================================================
+# GET DEADLINES
+# ============================================================
+
+@router.get("/{university_id}/deadlines")
+async def get_university_deadlines(
+    university_id: int,
+):
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    try:
+        validate_university(
+            cursor,
+            university_id,
+        )
+
+        deadlines = cursor.execute(
+            """
+            SELECT *
+            FROM admission_deadlines
+            WHERE university_id = ?
+            ORDER BY application_deadline ASC
+            """,
+            (university_id,),
+        ).fetchall()
+
+        return {
+            "success": True,
+            "count": len(deadlines),
+            "deadlines": rows_to_list(deadlines),
+        }
+
+    finally:
+        connection.close()
+
+
+# ============================================================
+# CREATE DEADLINE
 # ============================================================
 
 @router.post("/deadlines")
@@ -1465,39 +1795,30 @@ async def create_deadline(
     cursor = connection.cursor()
 
     try:
-        university = cursor.execute(
-            """
-            SELECT id
-            FROM universities
-            WHERE id = ?
-            """,
-            (request.university_id,),
-        ).fetchone()
-
-        if not university:
-            raise HTTPException(
-                status_code=404,
-                detail="University not found.",
-            )
+        validate_university(
+            cursor,
+            request.university_id,
+        )
 
         if request.program_id is not None:
+            validate_program(
+                cursor,
+                request.program_id,
+            )
+
             program = cursor.execute(
                 """
-                SELECT id
+                SELECT university_id
                 FROM university_programs
                 WHERE id = ?
-                AND university_id = ?
                 """,
-                (
-                    request.program_id,
-                    request.university_id,
-                ),
+                (request.program_id,),
             ).fetchone()
 
-            if not program:
+            if program["university_id"] != request.university_id:
                 raise HTTPException(
-                    status_code=404,
-                    detail="Program not found for this university.",
+                    status_code=400,
+                    detail="Program does not belong to this university.",
                 )
 
         cursor.execute(
@@ -1522,23 +1843,45 @@ async def create_deadline(
             (
                 request.university_id,
                 request.program_id,
-                request.admission_title,
-                request.admission_session,
-                request.application_open_date,
-                request.application_deadline,
-                request.entry_test_date,
-                request.interview_date,
-                request.merit_list_date,
-                request.fee_submission_deadline,
-                request.admission_status,
-                request.source_url,
-                request.last_verified,
+                normalize_optional_string(
+                    request.admission_title
+                ),
+                normalize_optional_string(
+                    request.admission_session
+                ),
+                normalize_optional_string(
+                    request.application_open_date
+                ),
+                normalize_optional_string(
+                    request.application_deadline
+                ),
+                normalize_optional_string(
+                    request.entry_test_date
+                ),
+                normalize_optional_string(
+                    request.interview_date
+                ),
+                normalize_optional_string(
+                    request.merit_list_date
+                ),
+                normalize_optional_string(
+                    request.fee_submission_deadline
+                ),
+                normalize_optional_string(
+                    request.admission_status
+                ),
+                normalize_optional_string(
+                    request.source_url
+                ),
+                normalize_optional_string(
+                    request.last_verified
+                ),
             ),
         )
 
-        connection.commit()
-
         deadline_id = cursor.lastrowid
+
+        connection.commit()
 
         deadline = cursor.execute(
             """
@@ -1551,66 +1894,27 @@ async def create_deadline(
 
         return {
             "success": True,
-            "message": "Admission deadline added successfully.",
-            "deadline": dict(deadline),
+            "message": "Admission deadline created successfully.",
+            "deadline": row_to_dict(deadline),
         }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to create deadline: {str(error)}",
+        )
 
     finally:
         connection.close()
 
 
 # ============================================================
-# GET UNIVERSITY DEADLINES
-# ============================================================
-
-@router.get("/{university_id}/deadlines")
-async def get_university_deadlines(
-    university_id: int,
-):
-    connection = get_connection()
-    cursor = connection.cursor()
-
-    try:
-        university = cursor.execute(
-            """
-            SELECT id
-            FROM universities
-            WHERE id = ?
-            """,
-            (university_id,),
-        ).fetchone()
-
-        if not university:
-            raise HTTPException(
-                status_code=404,
-                detail="University not found.",
-            )
-
-        deadlines = cursor.execute(
-            """
-            SELECT *
-            FROM admission_deadlines
-            WHERE university_id = ?
-            ORDER BY application_deadline ASC
-            """,
-            (university_id,),
-        ).fetchall()
-
-        return {
-            "success": True,
-            "count": len(deadlines),
-            "deadlines": [
-                dict(item)
-                for item in deadlines
-            ],
-        }
-
-    finally:
-        connection.close()
-
-
-# ============================================================
-# UPDATE ADMISSION DEADLINE
+# UPDATE DEADLINE
 # ============================================================
 
 @router.put("/deadlines/{deadline_id}")
@@ -1637,30 +1941,25 @@ async def update_deadline(
                 detail="Admission deadline not found.",
             )
 
-        program_id = (
-            request.program_id
-            if request.program_id is not None
-            else existing["program_id"]
-        )
+        if request.program_id is not None:
+            validate_program(
+                cursor,
+                request.program_id,
+            )
 
-        if program_id is not None:
             program = cursor.execute(
                 """
-                SELECT id
+                SELECT university_id
                 FROM university_programs
                 WHERE id = ?
-                AND university_id = ?
                 """,
-                (
-                    program_id,
-                    existing["university_id"],
-                ),
+                (request.program_id,),
             ).fetchone()
 
-            if not program:
+            if program["university_id"] != existing["university_id"]:
                 raise HTTPException(
-                    status_code=404,
-                    detail="Program not found for this university.",
+                    status_code=400,
+                    detail="Program does not belong to this university.",
                 )
 
         cursor.execute(
@@ -1683,47 +1982,61 @@ async def update_deadline(
             WHERE id = ?
             """,
             (
-                program_id,
+                request.program_id
+                if request.program_id is not None
+                else existing["program_id"],
+
                 request.admission_title
                 if request.admission_title is not None
                 else existing["admission_title"],
+
                 request.admission_session
                 if request.admission_session is not None
                 else existing["admission_session"],
+
                 request.application_open_date
                 if request.application_open_date is not None
                 else existing["application_open_date"],
+
                 request.application_deadline
                 if request.application_deadline is not None
                 else existing["application_deadline"],
+
                 request.entry_test_date
                 if request.entry_test_date is not None
                 else existing["entry_test_date"],
+
                 request.interview_date
                 if request.interview_date is not None
                 else existing["interview_date"],
+
                 request.merit_list_date
                 if request.merit_list_date is not None
                 else existing["merit_list_date"],
+
                 request.fee_submission_deadline
                 if request.fee_submission_deadline is not None
                 else existing["fee_submission_deadline"],
+
                 request.admission_status
                 if request.admission_status is not None
                 else existing["admission_status"],
+
                 request.source_url
                 if request.source_url is not None
                 else existing["source_url"],
+
                 request.last_verified
                 if request.last_verified is not None
                 else existing["last_verified"],
+
                 deadline_id,
             ),
         )
 
         connection.commit()
 
-        updated = cursor.execute(
+        deadline = cursor.execute(
             """
             SELECT *
             FROM admission_deadlines
@@ -1735,15 +2048,26 @@ async def update_deadline(
         return {
             "success": True,
             "message": "Admission deadline updated successfully.",
-            "deadline": dict(updated),
+            "deadline": row_to_dict(deadline),
         }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to update deadline: {str(error)}",
+        )
 
     finally:
         connection.close()
 
 
 # ============================================================
-# DELETE ADMISSION DEADLINE
+# DELETE DEADLINE
 # ============================================================
 
 @router.delete("/deadlines/{deadline_id}")
@@ -1784,12 +2108,67 @@ async def delete_deadline(
             "message": "Admission deadline deleted successfully.",
         }
 
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to delete deadline: {str(error)}",
+        )
+
     finally:
         connection.close()
 
 
 # ============================================================
-# CREATE ADMISSION REQUIREMENT
+# ============================================================
+# REQUIREMENTS
+# ============================================================
+# ============================================================
+
+
+# ============================================================
+# GET REQUIREMENTS
+# ============================================================
+
+@router.get("/{university_id}/requirements")
+async def get_university_requirements(
+    university_id: int,
+):
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    try:
+        validate_university(
+            cursor,
+            university_id,
+        )
+
+        requirements = cursor.execute(
+            """
+            SELECT *
+            FROM admission_requirements
+            WHERE university_id = ?
+            ORDER BY requirement_title ASC
+            """,
+            (university_id,),
+        ).fetchall()
+
+        return {
+            "success": True,
+            "count": len(requirements),
+            "requirements": rows_to_list(requirements),
+        }
+
+    finally:
+        connection.close()
+
+
+# ============================================================
+# CREATE REQUIREMENT
 # ============================================================
 
 @router.post("/requirements")
@@ -1800,39 +2179,30 @@ async def create_requirement(
     cursor = connection.cursor()
 
     try:
-        university = cursor.execute(
-            """
-            SELECT id
-            FROM universities
-            WHERE id = ?
-            """,
-            (request.university_id,),
-        ).fetchone()
-
-        if not university:
-            raise HTTPException(
-                status_code=404,
-                detail="University not found.",
-            )
+        validate_university(
+            cursor,
+            request.university_id,
+        )
 
         if request.program_id is not None:
+            validate_program(
+                cursor,
+                request.program_id,
+            )
+
             program = cursor.execute(
                 """
-                SELECT id
+                SELECT university_id
                 FROM university_programs
                 WHERE id = ?
-                AND university_id = ?
                 """,
-                (
-                    request.program_id,
-                    request.university_id,
-                ),
+                (request.program_id,),
             ).fetchone()
 
-            if not program:
+            if program["university_id"] != request.university_id:
                 raise HTTPException(
-                    status_code=404,
-                    detail="Program not found for this university.",
+                    status_code=400,
+                    detail="Program does not belong to this university.",
                 )
 
         cursor.execute(
@@ -1856,22 +2226,36 @@ async def create_requirement(
             (
                 request.university_id,
                 request.program_id,
-                request.requirement_type,
-                request.requirement_title,
-                request.requirement_description,
+                normalize_optional_string(
+                    request.requirement_type
+                ),
+                normalize_optional_string(
+                    request.requirement_title
+                ),
+                normalize_optional_string(
+                    request.requirement_description
+                ),
                 request.minimum_percentage,
-                request.required_subjects,
-                request.required_documents,
+                normalize_optional_string(
+                    request.required_subjects
+                ),
+                normalize_optional_string(
+                    request.required_documents
+                ),
                 int(request.domicile_required),
                 int(request.entry_test_required),
-                request.source_url,
-                request.last_verified,
+                normalize_optional_string(
+                    request.source_url
+                ),
+                normalize_optional_string(
+                    request.last_verified
+                ),
             ),
         )
 
-        connection.commit()
-
         requirement_id = cursor.lastrowid
+
+        connection.commit()
 
         requirement = cursor.execute(
             """
@@ -1884,66 +2268,27 @@ async def create_requirement(
 
         return {
             "success": True,
-            "message": "Admission requirement added successfully.",
-            "requirement": dict(requirement),
+            "message": "Admission requirement created successfully.",
+            "requirement": row_to_dict(requirement),
         }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to create requirement: {str(error)}",
+        )
 
     finally:
         connection.close()
 
 
 # ============================================================
-# GET UNIVERSITY REQUIREMENTS
-# ============================================================
-
-@router.get("/{university_id}/requirements")
-async def get_university_requirements(
-    university_id: int,
-):
-    connection = get_connection()
-    cursor = connection.cursor()
-
-    try:
-        university = cursor.execute(
-            """
-            SELECT id
-            FROM universities
-            WHERE id = ?
-            """,
-            (university_id,),
-        ).fetchone()
-
-        if not university:
-            raise HTTPException(
-                status_code=404,
-                detail="University not found.",
-            )
-
-        requirements = cursor.execute(
-            """
-            SELECT *
-            FROM admission_requirements
-            WHERE university_id = ?
-            ORDER BY requirement_title ASC
-            """,
-            (university_id,),
-        ).fetchall()
-
-        return {
-            "success": True,
-            "count": len(requirements),
-            "requirements": [
-                dict(item)
-                for item in requirements
-            ],
-        }
-
-    finally:
-        connection.close()
-
-
-# ============================================================
-# UPDATE ADMISSION REQUIREMENT
+# UPDATE REQUIREMENT
 # ============================================================
 
 @router.put("/requirements/{requirement_id}")
@@ -1970,30 +2315,25 @@ async def update_requirement(
                 detail="Admission requirement not found.",
             )
 
-        program_id = (
-            request.program_id
-            if request.program_id is not None
-            else existing["program_id"]
-        )
+        if request.program_id is not None:
+            validate_program(
+                cursor,
+                request.program_id,
+            )
 
-        if program_id is not None:
             program = cursor.execute(
                 """
-                SELECT id
+                SELECT university_id
                 FROM university_programs
                 WHERE id = ?
-                AND university_id = ?
                 """,
-                (
-                    program_id,
-                    existing["university_id"],
-                ),
+                (request.program_id,),
             ).fetchone()
 
-            if not program:
+            if program["university_id"] != existing["university_id"]:
                 raise HTTPException(
-                    status_code=404,
-                    detail="Program not found for this university.",
+                    status_code=400,
+                    detail="Program does not belong to this university.",
                 )
 
         cursor.execute(
@@ -2015,44 +2355,57 @@ async def update_requirement(
             WHERE id = ?
             """,
             (
-                program_id,
+                request.program_id
+                if request.program_id is not None
+                else existing["program_id"],
+
                 request.requirement_type
                 if request.requirement_type is not None
                 else existing["requirement_type"],
+
                 request.requirement_title
                 if request.requirement_title is not None
                 else existing["requirement_title"],
+
                 request.requirement_description
                 if request.requirement_description is not None
                 else existing["requirement_description"],
+
                 request.minimum_percentage
                 if request.minimum_percentage is not None
                 else existing["minimum_percentage"],
+
                 request.required_subjects
                 if request.required_subjects is not None
                 else existing["required_subjects"],
+
                 request.required_documents
                 if request.required_documents is not None
                 else existing["required_documents"],
+
                 int(request.domicile_required)
                 if request.domicile_required is not None
                 else existing["domicile_required"],
+
                 int(request.entry_test_required)
                 if request.entry_test_required is not None
                 else existing["entry_test_required"],
+
                 request.source_url
                 if request.source_url is not None
                 else existing["source_url"],
+
                 request.last_verified
                 if request.last_verified is not None
                 else existing["last_verified"],
+
                 requirement_id,
             ),
         )
 
         connection.commit()
 
-        updated = cursor.execute(
+        requirement = cursor.execute(
             """
             SELECT *
             FROM admission_requirements
@@ -2064,15 +2417,26 @@ async def update_requirement(
         return {
             "success": True,
             "message": "Admission requirement updated successfully.",
-            "requirement": dict(updated),
+            "requirement": row_to_dict(requirement),
         }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to update requirement: {str(error)}",
+        )
 
     finally:
         connection.close()
 
 
 # ============================================================
-# DELETE ADMISSION REQUIREMENT
+# DELETE REQUIREMENT
 # ============================================================
 
 @router.delete("/requirements/{requirement_id}")
@@ -2113,12 +2477,67 @@ async def delete_requirement(
             "message": "Admission requirement deleted successfully.",
         }
 
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to delete requirement: {str(error)}",
+        )
+
     finally:
         connection.close()
 
 
 # ============================================================
-# CREATE UNIVERSITY SOURCE
+# ============================================================
+# SOURCES
+# ============================================================
+# ============================================================
+
+
+# ============================================================
+# GET SOURCES
+# ============================================================
+
+@router.get("/{university_id}/sources")
+async def get_university_sources(
+    university_id: int,
+):
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    try:
+        validate_university(
+            cursor,
+            university_id,
+        )
+
+        sources = cursor.execute(
+            """
+            SELECT *
+            FROM university_sources
+            WHERE university_id = ?
+            ORDER BY last_checked DESC
+            """,
+            (university_id,),
+        ).fetchall()
+
+        return {
+            "success": True,
+            "count": len(sources),
+            "sources": rows_to_list(sources),
+        }
+
+    finally:
+        connection.close()
+
+
+# ============================================================
+# CREATE SOURCE
 # ============================================================
 
 @router.post("/sources")
@@ -2129,20 +2548,10 @@ async def create_source(
     cursor = connection.cursor()
 
     try:
-        university = cursor.execute(
-            """
-            SELECT id
-            FROM universities
-            WHERE id = ?
-            """,
-            (request.university_id,),
-        ).fetchone()
-
-        if not university:
-            raise HTTPException(
-                status_code=404,
-                detail="University not found.",
-            )
+        validate_university(
+            cursor,
+            request.university_id,
+        )
 
         source_title = request.source_title.strip()
         source_url = request.source_url.strip()
@@ -2150,13 +2559,13 @@ async def create_source(
         if not source_title:
             raise HTTPException(
                 status_code=400,
-                detail="Source title is required.",
+                detail="Source title cannot be empty.",
             )
 
         if not source_url:
             raise HTTPException(
                 status_code=400,
-                detail="Source URL is required.",
+                detail="Source URL cannot be empty.",
             )
 
         cursor.execute(
@@ -2177,17 +2586,27 @@ async def create_source(
                 request.university_id,
                 source_title,
                 source_url,
-                request.source_type,
-                request.academic_session,
-                request.verification_status,
-                request.last_checked,
-                request.notes,
+                normalize_optional_string(
+                    request.source_type
+                ),
+                normalize_optional_string(
+                    request.academic_session
+                ),
+                normalize_optional_string(
+                    request.verification_status
+                ) or "pending",
+                normalize_optional_string(
+                    request.last_checked
+                ),
+                normalize_optional_string(
+                    request.notes
+                ),
             ),
         )
 
-        connection.commit()
-
         source_id = cursor.lastrowid
+
+        connection.commit()
 
         source = cursor.execute(
             """
@@ -2200,66 +2619,27 @@ async def create_source(
 
         return {
             "success": True,
-            "message": "University source added successfully.",
-            "source": dict(source),
+            "message": "University source created successfully.",
+            "source": row_to_dict(source),
         }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to create source: {str(error)}",
+        )
 
     finally:
         connection.close()
 
 
 # ============================================================
-# GET UNIVERSITY SOURCES
-# ============================================================
-
-@router.get("/{university_id}/sources")
-async def get_university_sources(
-    university_id: int,
-):
-    connection = get_connection()
-    cursor = connection.cursor()
-
-    try:
-        university = cursor.execute(
-            """
-            SELECT id
-            FROM universities
-            WHERE id = ?
-            """,
-            (university_id,),
-        ).fetchone()
-
-        if not university:
-            raise HTTPException(
-                status_code=404,
-                detail="University not found.",
-            )
-
-        sources = cursor.execute(
-            """
-            SELECT *
-            FROM university_sources
-            WHERE university_id = ?
-            ORDER BY last_checked DESC
-            """,
-            (university_id,),
-        ).fetchall()
-
-        return {
-            "success": True,
-            "count": len(sources),
-            "sources": [
-                dict(source)
-                for source in sources
-            ],
-        }
-
-    finally:
-        connection.close()
-
-
-# ============================================================
-# UPDATE UNIVERSITY SOURCE
+# UPDATE SOURCE
 # ============================================================
 
 @router.put("/sources/{source_id}")
@@ -2327,28 +2707,34 @@ async def update_source(
             (
                 source_title,
                 source_url,
+
                 request.source_type
                 if request.source_type is not None
                 else existing["source_type"],
+
                 request.academic_session
                 if request.academic_session is not None
                 else existing["academic_session"],
+
                 request.verification_status
                 if request.verification_status is not None
                 else existing["verification_status"],
+
                 request.last_checked
                 if request.last_checked is not None
                 else existing["last_checked"],
+
                 request.notes
                 if request.notes is not None
                 else existing["notes"],
+
                 source_id,
             ),
         )
 
         connection.commit()
 
-        updated = cursor.execute(
+        source = cursor.execute(
             """
             SELECT *
             FROM university_sources
@@ -2360,15 +2746,26 @@ async def update_source(
         return {
             "success": True,
             "message": "University source updated successfully.",
-            "source": dict(updated),
+            "source": row_to_dict(source),
         }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to update source: {str(error)}",
+        )
 
     finally:
         connection.close()
 
 
 # ============================================================
-# DELETE UNIVERSITY SOURCE
+# DELETE SOURCE
 # ============================================================
 
 @router.delete("/sources/{source_id}")
@@ -2408,6 +2805,17 @@ async def delete_source(
             "success": True,
             "message": "University source deleted successfully.",
         }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to delete source: {str(error)}",
+        )
 
     finally:
         connection.close()
